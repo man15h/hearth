@@ -1,0 +1,12 @@
+node_modules/
+.svelte-kit/
+build/
+.env
+config.yml
+data/
+*.log
+.DS_Store
+test-results/
+*.png
+yarn.lock
+config.yml
