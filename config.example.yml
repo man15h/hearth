@@ -1,0 +1,222 @@
+# Hearth Dashboard Configuration
+# Copy this to config.yml and customize for your setup.
+# Secrets use ${ENV_VAR} syntax — substituted at load time from environment variables.
+
+# ── Branding ─────────────────────────────────────────────────
+branding:
+  name: "My Homelab"                          # Displayed in header, footer, PWA manifest
+  short_name: "homelab"                       # PWA short name (optional)
+  description: "Personal dashboard"           # Meta description
+  logo: "/icons/logo.svg"                     # Path in static/, full URL, or null for default
+  favicon: "/icons/favicon.svg"               # Path in static/, full URL, or null (uses logo, then default)
+  font:
+    family: "JetBrains Mono"
+    url: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+  theme_color: "#09090b"                      # PWA theme color and meta tag
+
+# ── Authentication ───────────────────────────────────────────
+auth:
+  enabled: true                               # false = no login required, dashboard always visible
+  oidc:
+    issuer: "https://auth.example.com"        # Your OIDC provider URL
+    client_id: "${OIDC_CLIENT_ID}"            # Environment variable
+    client_secret: "${OIDC_CLIENT_SECRET}"    # Environment variable
+    scopes: "openid profile groups"            # Add "groups" to enable group-based admin detection
+    redirect_base: "https://dash.example.com" # Your dashboard's public URL
+    # Endpoints are auto-discovered from .well-known/openid-configuration.
+    # Override only if your provider uses non-standard paths:
+    # authorization_endpoint: "/api/oidc/authorization"
+    # token_endpoint: "/api/oidc/token"
+    # userinfo_endpoint: "/api/oidc/userinfo"
+  admin_groups:                               # OIDC groups claim — users in these groups see admin-only apps
+    - "lldap_admin"
+  admin_usernames:                            # Fallback: username-based admin check (when groups unavailable)
+    - "admin"
+  password_change_url: null                   # If set, shows "Change password" in settings menu
+  registration:
+    enabled: false
+    url: null                                 # External registration page URL (e.g., Tally form)
+
+# ── Database ─────────────────────────────────────────────────
+# When enabled, user preferences are persisted to SQLite (survives browser clears).
+# When disabled, preferences are stored in localStorage only (per-browser, no sync).
+# Path can also be set via DATABASE_PATH env var.
+database:
+  enabled: true
+  # path: "./data/hearth.db"                     # Default SQLite path
+
+# ── Customization ───────────────────────────────────────────
+# When enabled, authenticated users get a Configure panel to:
+#   - Toggle app visibility, reorder apps, add bookmarks
+#   - Switch icon style (Colored / White / Grayed)
+#   - Admins can add apps from a searchable directory
+# When disabled, the dashboard shows a static grid from config — no user settings.
+customization:
+  enabled: true
+
+# ── Apps / Bookmarks ────────────────────────────────────────
+# Each category has a label and a list of apps.
+# Icon fields:
+#   icon:       Full-color icon (required). Prefixes: di:name (Dashboard Icons), si:name (Simple Icons), or full URL
+#   icon_mono:  Mono icon for white/grayed styles (optional). Same prefixes. Falls back to grayscale of colored icon.
+#   tile_color: Hex background for iOS-style brand tile (optional). e.g. "#FF0000"
+# Users can switch between Colored / White / Grayed icon styles in Configure.
+apps:
+  - category: "Storage"
+    items:
+      - id: photos
+        name: "Photos"
+        url: "https://photos.example.com"
+        icon: "di:immich"
+        self_hosted: true                        # Marks as self-hosted (shows in onboarding)
+        default_visible: true                 # Shown by default; user can toggle off
+        app_store:
+          ios: "https://apps.apple.com/app/immich/id1613945652"
+          android: "https://play.google.com/store/apps/details?id=app.alextran.immich"
+        setup_guide:
+          subtitle: "Immich - Auto backup your photos & videos"
+          steps:
+            - label: "Download the app"
+              desc: "Get Immich from the App Store or Play Store."
+            - label: "Open & connect"
+              desc: "Launch the app and enter the server URL."
+            - label: "Sign in"
+              desc: "Use your credentials."
+            - label: "Enable backup"
+              desc: "Go to Settings > Backup and enable auto-upload."
+
+      - id: cloud
+        name: "Cloud"
+        url: "https://cloud.example.com"
+        icon: "di:nextcloud"
+        self_hosted: true
+        default_visible: true
+        app_store:
+          ios: "https://apps.apple.com/app/nextcloud/id1125420102"
+          android: "https://play.google.com/store/apps/details?id=com.nextcloud.client"
+
+      - id: vault
+        name: "Vault"
+        url: "https://vault.example.com"
+        icon: "di:bitwarden"
+        self_hosted: true
+        default_visible: true
+        app_store:
+          ios: "https://apps.apple.com/app/bitwarden/id1137397744"
+          android: "https://play.google.com/store/apps/details?id=com.x8bit.bitwarden"
+        browser_extension: "https://bitwarden.com/download/#downloads-web-browser"
+
+  - category: "Social"
+    items:
+      - id: reddit
+        name: "Reddit"
+        url: "https://reddit.com"
+        icon: "di:reddit"
+        default_visible: true
+      - id: youtube
+        name: "YouTube"
+        url: "https://youtube.com"
+        icon: "di:youtube"
+        default_visible: true
+
+  - category: "Tools"
+    items:
+      - id: admin-panel
+        name: "Admin"
+        url: "https://admin.example.com"
+        icon: "di:authelia"
+        self_hosted: true
+        admin_only: true                      # Only visible to admin_usernames
+        default_visible: true
+
+# ── News Headlines ──────────────────────────────────────────
+news:
+  enabled: true
+  rss_url: "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
+
+# ── Search Bar ──────────────────────────────────────────────
+search:
+  enabled: true
+  url: "https://www.google.com/search"        # Search engine URL
+  param: "q"                                  # Query parameter name
+
+# ── Wallpapers ──────────────────────────────────────────────
+wallpapers:
+  enabled: true
+  source: "gitlab"                            # "gitlab" = built-in DT wallpapers
+  count: 326
+
+# ── Weather Widget ──────────────────────────────────────────
+weather:
+  enabled: true
+  default_lat: 40.7128                        # Default coordinates (before user grants location)
+  default_lon: -74.0060
+
+# ── Onboarding ──────────────────────────────────────────────
+onboarding:
+  enabled: true
+  welcome_text: "A self-hosted server for your household. Your data stays on your hardware — no third-party clouds, no tracking, no ads."
+  phishing_domain: "auth.example.com"         # "Only enter credentials at this domain"
+  show_privacy: true                          # Show "Private by Design" slide (default: true)
+  show_security_tips: true                    # Show "Stay Safe Online" slide (default: true)
+  # privacy_claims:                           # If empty, shows generic defaults (see below)
+  #   - text: "Your data lives on **our hardware** — never on third-party clouds"
+  #   - text: "**Encrypted** storage with daily off-site backups"
+  #   - text: "**No tracking**, no ads, no data selling — ever"
+  #   - text: "**SSO with 2FA** across all services"
+  # security_tips:                            # If empty, shows generic defaults (passwords, 2FA, phishing)
+  #   - title: "Use a password manager"
+  #     desc: "Store unique passwords for every site"
+  #   - title: "Enable 2FA"
+  #     desc: "Add TOTP to all accounts that support it"
+  #   - title: "Watch for phishing"
+  #     desc: "Only enter credentials at your auth domain"
+  # services:                                 # If empty, auto-derived from apps with self_hosted: true
+  #   - name: "Photos"
+  #     description: "100 GB storage"
+  #     icon: "si:immich"
+  #   - name: "Cloud"
+  #     description: "50 GB storage"
+  #     icon: "si:nextcloud"
+
+# ── Privacy Policy ──────────────────────────────────────────
+# Option A: Use a markdown file (recommended)
+#   file: "privacy.md"               # Path relative to config.yml
+# Option B: Inline sections (below)
+privacy:
+  enabled: true
+  last_updated: "March 2026"
+  # file: "privacy.md"               # Uncomment to use markdown instead of sections
+  sections:
+    - title: "What we store"
+      items:
+        - "Account info (name, email, hashed password)"
+        - "Your uploaded files on encrypted storage"
+        - "App preferences and settings"
+    - title: "What we don't do"
+      items:
+        - "No analytics or telemetry"
+        - "No advertising or tracking"
+        - "No selling or sharing data with third parties"
+    - title: "Security"
+      items:
+        - "TLS encryption everywhere"
+        - "Daily encrypted backups"
+        - "SSO with brute-force protection"
+    - title: "Your rights"
+      items:
+        - "View, export, or delete your data anytime"
+        - "Contact the server operator for questions"
+
+# ── Tips (shown for first 7 days after login) ───────────────
+tips:
+  enabled: true
+  max_days: 7
+  # items:                                    # If empty, auto-derived from apps with setup_guide
+  #   - id: vault
+  #     text: "Set up Vault to store all your passwords securely"
+  #     icon: "si:bitwarden"
+  #     app: "Vault"
+  #   - id: 2fa
+  #     text: "Enable 2FA on your account for extra security"
+  #     icon: "di:authelia"

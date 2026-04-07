@@ -1,0 +1,216 @@
+# Persona: Family server — non-technical users, simple apps, full onboarding
+branding:
+  name: "The Smiths"
+  short_name: "smiths"
+  description: "Our family's private cloud"
+  logo: null
+  favicon: null
+  font:
+    family: "JetBrains Mono"
+    url: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+  theme_color: "#09090b"
+
+auth:
+  enabled: true
+  password_change_url: "https://auth.smiths.home/settings"
+  registration:
+    enabled: true
+    url: "https://example.com/register"
+
+customization:
+  enabled: true
+
+apps:
+  - category: "Storage"
+    items:
+      - id: photos
+        name: "Photos"
+        url: "https://photos.smiths.home"
+        icon: "di:immich"
+        self_hosted: true
+        default_visible: true
+        app_store:
+          ios: "https://apps.apple.com/app/immich/id1613945652"
+          android: "https://play.google.com/store/apps/details?id=app.alextran.immich"
+        setup_guide:
+          subtitle: "Back up all your photos automatically"
+          steps:
+            - label: "Download the app"
+              desc: "Get Immich from the App Store or Play Store."
+            - label: "Enter server URL"
+              desc: "Open the app and type in the server address."
+            - label: "Turn on backup"
+              desc: "Enable auto-upload so your photos are always safe."
+
+      - id: files
+        name: "Files"
+        url: "https://files.smiths.home"
+        icon: "di:nextcloud"
+        tile_color: "#0082C9"
+        self_hosted: true
+        default_visible: true
+        setup_guide:
+          subtitle: "Shared family file storage"
+
+      - id: passwords
+        name: "Passwords"
+        url: "https://vault.smiths.home"
+        icon: "di:bitwarden"
+        tile_color: "#175DDC"
+        self_hosted: true
+        default_visible: true
+        app_store:
+          ios: "https://apps.apple.com/app/bitwarden/id1137397744"
+          android: "https://play.google.com/store/apps/details?id=com.x8bit.bitwarden"
+        browser_extension: "https://bitwarden.com/download/"
+        setup_guide:
+          subtitle: "Family password manager"
+          steps:
+            - label: "Install the app"
+              desc: "Get Bitwarden on your phone and browser."
+            - label: "Set custom server"
+              desc: "Before signing in, tap Self-hosted and enter the server URL."
+            - label: "Turn on autofill"
+              desc: "Enable autofill in your phone settings so passwords fill automatically."
+
+  - category: "Network"
+    items:
+      - id: pihole
+        name: "Pi-hole"
+        url: "https://pihole.smiths.home"
+        icon: "di:pi-hole"
+        tile_color: "#96060C"
+        self_hosted: true
+        admin_only: true
+        default_visible: true
+      - id: tailscale
+        name: "Tailscale"
+        url: "https://login.tailscale.com"
+        icon: "di:tailscale"
+        self_hosted: true
+        default_visible: true
+      - id: jellyseerr
+        name: "Jellyseerr"
+        url: "https://request.smiths.home"
+        icon: "di:jellyseerr"
+        self_hosted: true
+        default_visible: true
+      - id: adguard
+        name: "AdGuard"
+        url: "https://adguard.smiths.home"
+        icon: "di:adguard-home"
+        self_hosted: true
+        admin_only: true
+        default_visible: true
+      - id: uptime
+        name: "Uptime"
+        url: "https://status.smiths.home"
+        icon: "di:uptime-kuma"
+        self_hosted: true
+        admin_only: true
+        default_visible: true
+
+  - category: "Tools"
+    items:
+      - id: claude
+        name: "Claude"
+        url: "https://claude.ai"
+        icon: "di:claude-ai"
+        tile_color: "#D97757"
+        default_visible: true
+      - id: vscode
+        name: "Code"
+        url: "https://code.smiths.home"
+        icon: "di:visual-studio-code"
+        tile_color: "#007ACC"
+        self_hosted: true
+        default_visible: true
+      - id: gitea
+        name: "Gitea"
+        url: "https://git.smiths.home"
+        icon: "di:gitea"
+        tile_color: "#609926"
+        self_hosted: true
+        default_visible: true
+
+  - category: "Entertainment"
+    items:
+      - id: movies
+        name: "Movies"
+        url: "https://jellyfin.smiths.home"
+        icon: "di:jellyfin"
+        tile_color: "#00A4DC"
+        self_hosted: true
+        default_visible: true
+        setup_guide:
+          subtitle: "Stream our movie collection"
+
+      - id: youtube
+        name: "YouTube"
+        url: "https://youtube.com"
+        icon: "di:youtube"
+        tile_color: "#FF0000"
+        default_visible: true
+
+      - id: netflix
+        name: "Netflix"
+        url: "https://netflix.com"
+        icon: "di:netflix"
+        tile_color: "#E50914"
+        default_visible: true
+
+      - id: spotify
+        name: "Spotify"
+        url: "https://open.spotify.com"
+        icon: "di:spotify"
+        tile_color: "#1ED760"
+        default_visible: true
+
+news:
+  enabled: false
+
+search:
+  enabled: true
+  url: "https://www.google.com/search"
+  param: "q"
+
+wallpapers:
+  enabled: true
+  source: "gitlab"
+  count: 326
+
+weather:
+  enabled: true
+  default_lat: 40.7128
+  default_lon: -74.0060
+
+onboarding:
+  enabled: true
+  welcome_text: "Welcome to our family server! Your photos, files, and passwords — all private, all ours."
+  phishing_domain: "auth.smiths.home"
+  show_privacy: true
+  show_security_tips: true
+  security_tips:
+    - title: "Use Passwords app"
+      desc: "Never reuse the same password. Let Bitwarden generate and save strong ones for you."
+    - title: "Turn on 2FA"
+      desc: "Add a second step to your login. Ask Dad to help set up the authenticator app."
+    - title: "Don't share your login"
+      desc: "Everyone has their own account. Never share your password, even with family."
+
+privacy:
+  enabled: true
+  last_updated: "April 2026"
+  sections:
+    - title: "What we keep"
+      items:
+        - "Your photos and files on our home server"
+        - "Your account info (name + password)"
+    - title: "What we never do"
+      items:
+        - "No ads, no tracking, no data selling"
+        - "Nothing leaves our house"
+
+tips:
+  enabled: true
+  max_days: 14

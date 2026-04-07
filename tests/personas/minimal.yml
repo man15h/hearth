@@ -1,0 +1,84 @@
+# Persona: Minimal — no auth, no onboarding, just bookmarks
+branding:
+  name: "Start"
+  short_name: "start"
+  description: "Simple start page"
+  logo: null
+  favicon: null
+  font:
+    family: "JetBrains Mono"
+    url: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+  theme_color: "#09090b"
+
+auth:
+  enabled: false
+
+customization:
+  enabled: false
+
+apps:
+  - category: "Daily"
+    items:
+      - id: gmail
+        name: "Gmail"
+        url: "https://mail.google.com"
+        icon: "si:gmail"
+        default_visible: true
+      - id: calendar
+        name: "Calendar"
+        url: "https://calendar.google.com"
+        icon: "si:googlecalendar"
+        default_visible: true
+      - id: drive
+        name: "Drive"
+        url: "https://drive.google.com"
+        icon: "si:googledrive"
+        default_visible: true
+      - id: notion
+        name: "Notion"
+        url: "https://notion.so"
+        icon: "si:notion"
+        default_visible: true
+
+  - category: "Social"
+    items:
+      - id: reddit
+        name: "Reddit"
+        url: "https://reddit.com"
+        icon: "si:reddit"
+        default_visible: true
+      - id: youtube
+        name: "YouTube"
+        url: "https://youtube.com"
+        icon: "si:youtube"
+        default_visible: true
+      - id: twitter
+        name: "X"
+        url: "https://x.com"
+        icon: "si:x"
+        default_visible: true
+
+search:
+  enabled: true
+  url: "https://www.google.com/search"
+  param: "q"
+
+wallpapers:
+  enabled: false
+
+weather:
+  enabled: true
+  default_lat: 51.5074
+  default_lon: -0.1278
+
+onboarding:
+  enabled: false
+
+privacy:
+  enabled: false
+
+tips:
+  enabled: false
+
+news:
+  enabled: false
