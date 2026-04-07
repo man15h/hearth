@@ -1,0 +1,34 @@
+<script>
+	import '../app.css';
+	import { setContext } from 'svelte';
+	let { children, data } = $props();
+
+	const config = data.config;
+	setContext('config', config);
+
+	const brandName = config?.branding?.name || 'Hearth';
+	const brandDesc = config?.branding?.description || 'Self-hosted dashboard';
+	const themeColor = config?.branding?.theme_color || '#09090b';
+	const shortName = config?.branding?.short_name || brandName.toLowerCase();
+	const fontFamily = config?.branding?.font?.family || 'JetBrains Mono';
+	const fontUrl = config?.branding?.font?.url || 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap';
+</script>
+
+<svelte:head>
+	<title>{brandName}</title>
+	<meta name="description" content={brandDesc}>
+	<meta property="og:title" content={brandName}>
+	<meta property="og:description" content={brandDesc}>
+	<meta property="og:type" content="website">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content={brandName}>
+	<meta name="twitter:description" content={brandDesc}>
+	<meta name="theme-color" content={themeColor}>
+	<meta name="apple-mobile-web-app-title" content={shortName}>
+	{#if fontUrl}
+		<link href={fontUrl} rel="stylesheet">
+	{/if}
+	{@html `<style>:root { --font-family: '${fontFamily}', monospace; } body { font-family: var(--font-family); }</style>`}
+</svelte:head>
+
+{@render children()}

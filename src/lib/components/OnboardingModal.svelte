@@ -1,0 +1,388 @@
+<script>
+	import { browser } from '$app/environment';
+	import { getContext } from 'svelte';
+	import { prefs } from '$lib/stores/prefs.js';
+	import { getWallpaperUrl } from '$lib/wallpaper.js';
+	import { resolveIcon } from '$lib/apps.js';
+	import { getIconSrc, getIconClass, handleIconError } from '$lib/iconHelpers.js';
+
+	const siteConfig = getContext('config');
+	const brandName = siteConfig?.branding?.name || 'Hearth';
+	const brandLogo = siteConfig?.branding?.logo;
+
+	const iconStyle = $derived($prefs.iconStyle || 'colored');
+	const onboardingConfig = siteConfig?.onboarding || {};
+	const welcomeText = onboardingConfig.welcome_text || 'Your data stays on your hardware — no third-party clouds, no tracking, no ads.';
+	const phishingDomain = onboardingConfig.phishing_domain || '';
+	const registrationConfig = siteConfig?.auth?.registration;
+	const privacyConfig = siteConfig?.privacy || {};
+	const privacyHtml = privacyConfig.html || null;
+
+	let { oncomplete, authName = null, authUsername = null, devMode = false } = $props();
+
+	let step = $state(authName ? 'onboarding' : 'welcome');
+	let slide = $state(0);
+	let acceptedTerms = $state(false);
+	let showTerms = $state(false);
+	let deferredPrompt = $state(null);
+	let isMobile = $state(false);
+	let isIOS = $state(false);
+	let isStandalone = $state(false);
+	let wallpaperUrl = $state('');
+	let wallpaperLoaded = $state(false);
+
+	$effect(() => {
+		if (!browser) return;
+		wallpaperUrl = getWallpaperUrl();
+	});
+
+	$effect(() => {
+		if (!browser) return;
+		isMobile = window.matchMedia('(max-width: 768px)').matches;
+		isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+		const handler = (e) => {
+			e.preventDefault();
+			deferredPrompt = e;
+		};
+		window.addEventListener('beforeinstallprompt', handler);
+		return () => window.removeEventListener('beforeinstallprompt', handler);
+	});
+
+	async function installApp() {
+		if (deferredPrompt) {
+			deferredPrompt.prompt();
+			await deferredPrompt.userChoice;
+			deferredPrompt = null;
+		}
+	}
+
+	function next() {
+		if (slide < totalSlides - 1) slide++;
+	}
+
+	function back() {
+		if (slide > 0) slide--;
+	}
+
+	function finish() {
+		step = 'done';
+		prefs.update((p) => ({ ...p, name: authName, username: authUsername, onboarded: true, firstLoginAt: p.firstLoginAt || new Date().toISOString() }));
+		oncomplete();
+	}
+
+	function allowLocation() {
+		navigator.geolocation.getCurrentPosition(
+			(pos) => {
+				prefs.update((p) => ({
+					...p,
+					lat: pos.coords.latitude,
+					lon: pos.coords.longitude
+				}));
+				finish();
+			},
+			() => finish()
+		);
+	}
+
+	// Lock body scroll when any modal step is active
+	$effect(() => {
+		if (!browser) return;
+		if (step === 'welcome' || step === 'onboarding') {
+			document.body.style.overflow = 'hidden';
+			return () => { document.body.style.overflow = ''; };
+		}
+	});
+
+	// Derive services from config: use onboarding.services override, or auto-derive from self-hosted apps
+	const configServices = onboardingConfig.services?.length
+		? onboardingConfig.services.map(s => ({ name: s.name, desc: s.description || '', icon: resolveIcon(s.icon) }))
+		: (siteConfig?.apps || [])
+			.flatMap(cat => cat.items || [])
+			.filter(item => item.self_hosted && !item.admin_only)
+			.map(item => ({ name: item.name, desc: item.setup_guide?.subtitle || '', icon: resolveIcon(item.icon) }));
+
+	const services = configServices.length ? configServices : [
+		{ name: 'Photos', desc: '100 GB storage', icon: '/icons/photos.svg' },
+		{ name: 'Cloud', desc: '50 GB storage', icon: '/icons/cloud.svg' },
+		{ name: 'Vault', desc: 'Password manager', icon: '/icons/passwords.svg' }
+	];
+
+	// Security tips — configurable or sensible defaults
+	const defaultSecurityTips = [
+		{ title: 'Use strong passwords', desc: 'Use a password manager and never reuse passwords across sites' },
+		{ title: 'Enable 2FA', desc: 'Use a TOTP app like Aegis or Google Authenticator for all your accounts' },
+		{ title: 'Watch for phishing', desc: phishingDomain ? `Only enter credentials at ${phishingDomain}` : 'Only enter credentials at your auth provider' }
+	];
+	const securityTips = onboardingConfig.security_tips?.length
+		? onboardingConfig.security_tips
+		: defaultSecurityTips;
+
+	// Build dynamic slides array based on config
+	const weatherEnabled = siteConfig?.weather?.enabled !== false;
+	// Privacy claims — configurable or sensible defaults
+	const defaultPrivacyClaims = [
+		{ text: 'Your data lives on **our hardware** — never on third-party clouds' },
+		{ text: '**Encrypted** storage with daily off-site backups' },
+		{ text: '**No tracking**, no ads, no data selling — ever' },
+		{ text: '**SSO with 2FA** across all services' }
+	];
+	const privacyClaims = onboardingConfig.privacy_claims?.length
+		? onboardingConfig.privacy_claims
+		: defaultPrivacyClaims;
+
+	function renderBold(text) {
+		return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-content-muted">$1</strong>');
+	}
+
+	const showPrivacy = onboardingConfig.show_privacy !== false;
+	const showSecurityTips = onboardingConfig.show_security_tips !== false;
+	const hasServices = services.length > 0;
+
+	const slides = [
+		{ type: 'welcome' },
+		...(hasServices ? [{ type: 'services' }] : []),
+		...(showPrivacy ? [{ type: 'privacy' }] : []),
+		...(showSecurityTips ? [{ type: 'security' }] : []),
+		...(weatherEnabled ? [{ type: 'weather' }] : []),
+	];
+
+	const totalSlides = slides.length;
+
+	function currentSlideType() {
+		return slides[slide]?.type;
+	}
+</script>
+
+{#if step === 'welcome'}
+	<div class="fixed inset-0 flex flex-col items-center justify-center z-[100] p-4">
+		<!-- Wallpaper background -->
+		<div class="fixed inset-0 -z-20 bg-surface">
+			{#if wallpaperUrl}
+				<img src={wallpaperUrl} alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition-opacity duration-700 {wallpaperLoaded ? 'opacity-100' : 'opacity-0'}" onload={() => wallpaperLoaded = true} />
+			{/if}
+		</div>
+		<div class="fixed inset-0 -z-10 pointer-events-none backdrop-blur-[6px]" style="background: linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.15) 100%);"></div>
+		<div class="bg-surface-modal-card backdrop-blur-[80px] border border-border-modal-card rounded-2xl p-8 w-full max-w-[360px] text-center shadow-theme animate-modal-enter">
+			{#if brandLogo}
+				<img src={brandLogo} alt="" class="w-12 h-12 mx-auto mb-4" />
+			{:else}
+				<svg viewBox="4 4 24 24" class="w-12 h-12 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg">
+					<circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/>
+					<circle cx="16" cy="16" r="3" fill="white"/>
+				</svg>
+			{/if}
+			<span class="text-[0.65rem] text-content-muted uppercase tracking-[0.2em] mb-3 block">{brandName}</span>
+			<h2 class="text-[1.2rem] font-semibold mb-2">Welcome</h2>
+			<p class="text-content-muted text-[0.85rem] mb-6">Sign in to continue.</p>
+			<label class="inline-flex items-center gap-2.5 text-xs text-content-muted mb-5 cursor-pointer">
+				<input type="checkbox" bind:checked={acceptedTerms} class="w-4 h-4 accent-zinc-300 shrink-0 cursor-pointer">
+				<span>I agree to the <button type="button" class="bg-transparent border-none text-content font-mono text-xs cursor-pointer underline underline-offset-2 p-0 hover:text-content-dim" onclick={() => showTerms = !showTerms}>Privacy & Terms</button></span>
+			</label>
+			{#if showTerms}
+				<div class="bg-surface-input border border-border-card rounded-[10px] p-4 mb-5 text-left max-h-[200px] overflow-y-auto">
+					{#if privacyHtml}
+						<div class="onboarding-privacy-md text-[0.7rem] text-content-muted leading-relaxed">{@html privacyHtml}</div>
+					{:else if privacyConfig.sections?.length}
+						{#each privacyConfig.sections as section, i}
+							<p class="text-[0.7rem] text-content-muted leading-relaxed {i < privacyConfig.sections.length - 1 ? 'mb-2' : 'mb-0'}"><strong class="text-content">{section.title}:</strong> {section.items.join('. ')}.</p>
+						{/each}
+					{:else}
+						<p class="text-[0.7rem] text-content-muted mb-0 leading-relaxed">Your data stays on our hardware. No tracking, no ads, no data selling.</p>
+					{/if}
+				</div>
+			{/if}
+			<button
+				class="w-full py-3 px-4 border-none rounded-[10px] text-[0.9rem] font-medium font-mono cursor-pointer transition-[opacity,background] duration-200 bg-white text-zinc-950 mb-2 hover:not-disabled:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed"
+				disabled={!acceptedTerms}
+				onclick={() => window.location.href = devMode ? '/?user=demo' : '/auth/login'}
+			>Sign in</button>
+			{#if isMobile && !isStandalone}
+				{#if isIOS}
+					<p class="text-[0.75rem] text-content-dim mt-4">Tap <strong class="text-content-dim">Share</strong> then <strong class="text-content-dim">Add to Home Screen</strong> to install as an app</p>
+				{:else if deferredPrompt}
+					<button
+						class="w-full py-3 px-4 rounded-[10px] text-[0.9rem] font-medium font-mono cursor-pointer transition-[opacity,background] duration-200 bg-transparent text-content-dim border border-border-card mt-3 hover:text-content"
+						onclick={installApp}
+					>Add to Home Screen</button>
+				{/if}
+			{/if}
+		</div>
+		{#if registrationConfig?.enabled && registrationConfig?.url}
+		<p class="text-[0.75rem] text-content-dim mt-4 text-center animate-modal-enter">Don't have an account? <a href={registrationConfig.url} class="text-content-muted hover:text-content no-underline font-mono text-[0.75rem]">Register</a></p>
+		{/if}
+	</div>
+
+{:else if step === 'onboarding'}
+	<div class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in">
+		<div class="bg-surface-modal-card backdrop-blur-[120px] border border-border-modal-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme">
+
+			<!-- Slide content -->
+			<div class="p-8 pb-0 h-[420px] flex flex-col">
+				{#key slide}
+				<div class="flex-1 flex flex-col items-center justify-center animate-slide-in overflow-y-auto min-h-0">
+				{#if currentSlideType() === 'welcome'}
+					<div class="flex flex-col w-full">
+						<div class="flex items-center justify-center mb-4">
+						{#if brandLogo}
+							<img src={brandLogo} alt="" class="w-9 h-9" />
+						{:else}
+							<svg viewBox="4 4 24 24" class="w-9 h-9" xmlns="http://www.w3.org/2000/svg">
+								<circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/>
+								<circle cx="16" cy="16" r="3" fill="white"/>
+							</svg>
+						{/if}
+						</div>
+						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Welcome, {authName}</h2>
+						<p class="text-content-dim text-[0.75rem] mb-5 text-center">{brandName}</p>
+						<p class="text-content-muted text-[0.85rem] leading-relaxed text-center px-4">
+							{welcomeText}
+						</p>
+					</div>
+
+				{:else if currentSlideType() === 'services'}
+					<div class="flex flex-col w-full">
+						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">What you get</h2>
+						<p class="text-content-dim text-[0.75rem] mb-5 text-center">Included with your account — no extra cost</p>
+						<div class="space-y-1">
+							{#each services as svc, i}
+								<div class="flex items-center gap-3 px-2 py-2.5 ">
+									<img src={svc.icon?.colored || ''} alt="" class="w-5 h-5 shrink-0" onerror={(e) => handleIconError(e, svc.icon)} />
+									<span class="text-[0.8rem] text-content font-medium">{svc.name}</span>
+									{#if svc.desc}<span class="text-[0.7rem] text-content-dim ml-auto shrink-0 text-right max-md:text-[0.6rem]">{svc.desc}</span>{/if}
+								</div>
+							{/each}
+						</div>
+						<p class="text-content-dim/50 text-[0.65rem] mt-auto pt-4 text-center">All self-hosted on our hardware. Your data never leaves.</p>
+					</div>
+
+				{:else if currentSlideType() === 'privacy'}
+					<div class="flex flex-col w-full">
+						<div class="flex items-center justify-center mb-4">
+							<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+								<path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" class="text-content-dim"/>
+								<path d="M9 12l2 2 4-4" class="text-green-400"/>
+							</svg>
+						</div>
+						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Private by Design</h2>
+						<p class="text-content-dim text-[0.75rem] mb-5 text-center">How we handle your data</p>
+						<div class="space-y-1">
+							{#each privacyClaims as claim, i}
+								<div class="flex gap-3 items-start px-2 py-2.5 ">
+									<span class="text-green-400/60 text-xs mt-0.5 shrink-0">&#10003;</span>
+									<p class="text-content-muted text-[0.8rem] leading-relaxed m-0">{@html renderBold(claim.text)}</p>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+				{:else if currentSlideType() === 'security'}
+					<div class="flex flex-col w-full">
+						<div class="flex items-center justify-center mb-4">
+							<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+								<rect x="3" y="11" width="18" height="11" rx="2" class="text-content-dim"/>
+								<path d="M7 11V7a5 5 0 0 1 10 0v4" class="text-content-dim"/>
+								<circle cx="12" cy="16.5" r="1.5" fill="currentColor" class="text-content-muted"/>
+							</svg>
+						</div>
+						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Stay Safe Online</h2>
+						<p class="text-content-dim text-[0.75rem] mb-5 text-center">Tips to protect your accounts</p>
+						<div class="space-y-1">
+							{#each securityTips as tip, i}
+								<div class="flex gap-3 items-start px-2 py-2.5 ">
+									<span class="text-green-400/60 text-xs mt-0.5 shrink-0">&#10003;</span>
+									<p class="text-content-muted text-[0.8rem] leading-relaxed m-0"><strong class="text-content">{tip.title}</strong> — {tip.desc}</p>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+				{:else if currentSlideType() === 'weather'}
+					<div class="flex flex-col w-full">
+						<div class="flex items-center justify-center mb-4">
+							<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+								<circle cx="12" cy="12" r="4" class="text-content-muted"/>
+								<path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" class="text-content-dim"/>
+							</svg>
+						</div>
+						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Local Weather</h2>
+						<p class="text-content-dim text-[0.75rem] mb-5 text-center">Optional — stays on your device</p>
+						<p class="text-content-muted text-[0.8rem] leading-relaxed text-center px-4 mb-6">
+							Allow location access to show weather on your dashboard.
+						</p>
+						<div class="flex flex-col items-center gap-2 mt-auto">
+							<button
+								class="w-full max-w-[280px] py-3 px-4 border-none rounded-[10px] text-[0.85rem] font-medium font-mono cursor-pointer transition-[opacity,background] duration-200 bg-surface-card-strong text-content border border-border-card hover:bg-surface-card-strong"
+								onclick={allowLocation}
+							>Allow Location</button>
+							<button
+								class="text-[0.75rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono"
+								onclick={finish}
+							>Skip, I'll set it later</button>
+						</div>
+					</div>
+				{/if}
+				</div>
+				{/key}
+			</div>
+
+			<!-- Bottom bar: dots + navigation -->
+			<div class="p-6 pt-4 flex items-center justify-between">
+				<!-- Dot indicators -->
+				<div class="flex gap-1.5">
+					{#each Array(totalSlides) as _, i}
+						<button
+							class="w-1.5 h-1.5 rounded-full border-none cursor-pointer transition-all duration-200 p-0 {i === slide ? 'bg-zinc-50 w-4' : 'bg-zinc-700 hover:bg-zinc-500'}"
+							onclick={() => slide = i}
+						></button>
+					{/each}
+				</div>
+
+				<!-- Navigation buttons -->
+				<div class="flex gap-2">
+					<button
+						class="py-2 px-5 rounded-lg text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 bg-transparent text-content-dim border border-border-pill hover:text-content disabled:opacity-0 disabled:cursor-default"
+						disabled={slide === 0}
+						onclick={back}
+					>Back</button>
+					{#if slide === totalSlides - 1 && currentSlideType() !== 'weather'}
+					<button
+						class="py-2 px-5 rounded-lg text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 bg-white text-zinc-950 hover:bg-zinc-200"
+						onclick={finish}
+					>Get Started</button>
+					{:else}
+					<button
+						class="py-2 px-5 rounded-lg text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 bg-surface-card-strong text-content border border-border-card hover:bg-surface-card-strong disabled:opacity-0 disabled:cursor-default"
+						disabled={slide === totalSlides - 1}
+						onclick={next}
+					>Next</button>
+					{/if}
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<style>
+	.onboarding-privacy-md :global(h1),
+	.onboarding-privacy-md :global(h2),
+	.onboarding-privacy-md :global(h3) {
+		color: var(--text);
+		font-weight: 600;
+		margin-top: 0.5rem;
+		margin-bottom: 0.125rem;
+		font-size: 0.75rem;
+	}
+	.onboarding-privacy-md :global(p) { margin: 0.25rem 0; }
+	.onboarding-privacy-md :global(ul) { padding-left: 1rem; margin: 0.125rem 0; }
+	.onboarding-privacy-md :global(li) { margin-bottom: 0.0625rem; }
+	.onboarding-privacy-md :global(strong) { color: var(--text); }
+	@keyframes slide-in {
+		from { opacity: 0; transform: translateY(8px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+	:global(.animate-slide-in) {
+		animation: slide-in 0.25s ease-out both;
+	}
+</style>

@@ -1,0 +1,152 @@
+# Persona: Solo developer — infra-heavy, no onboarding fluff, no weather
+branding:
+  name: "DevBox"
+  short_name: "devbox"
+  description: "Personal dev dashboard"
+  logo: null
+  favicon: null
+  font:
+    family: "JetBrains Mono"
+    url: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+  theme_color: "#09090b"
+
+auth:
+  enabled: true
+
+customization:
+  enabled: true
+
+apps:
+  - category: "Dev"
+    items:
+      - id: github
+        name: "GitHub"
+        url: "https://github.com"
+        icon: "di:github"
+        tile_color: "#181717"
+        default_visible: true
+      - id: gitea
+        name: "Gitea"
+        url: "https://git.dev.box"
+        icon: "di:gitea"
+        tile_color: "#609926"
+        self_hosted: true
+        default_visible: true
+      - id: docker
+        name: "Docker"
+        url: "https://hub.docker.com"
+        icon: "di:docker"
+        tile_color: "#2496ED"
+        default_visible: true
+      - id: vscode
+        name: "Code"
+        url: "https://code.dev.box"
+        icon: "di:visual-studio-code"
+        tile_color: "#007ACC"
+        self_hosted: true
+        default_visible: true
+
+  - category: "Infra"
+    items:
+      - id: portainer
+        name: "Portainer"
+        url: "https://portainer.dev.box"
+        icon: "di:portainer"
+        tile_color: "#13BEF9"
+        self_hosted: true
+        default_visible: true
+      - id: grafana
+        name: "Grafana"
+        url: "https://grafana.dev.box"
+        icon: "di:grafana"
+        tile_color: "#F46800"
+        self_hosted: true
+        default_visible: true
+      - id: traefik
+        name: "Traefik"
+        url: "https://traefik.dev.box"
+        icon: "di:traefik"
+        self_hosted: true
+        default_visible: true
+      - id: prometheus
+        name: "Prometheus"
+        url: "https://prom.dev.box"
+        icon: "di:prometheus"
+        tile_color: "#E6522C"
+        self_hosted: true
+        default_visible: true
+
+  - category: "Apps"
+    items:
+      - id: cloud
+        name: "Cloud"
+        url: "https://cloud.dev.box"
+        icon: "di:nextcloud"
+        tile_color: "#0082C9"
+        self_hosted: true
+        default_visible: true
+      - id: vault
+        name: "Vault"
+        url: "https://vault.dev.box"
+        icon: "di:bitwarden"
+        tile_color: "#175DDC"
+        self_hosted: true
+        default_visible: true
+      - id: immich
+        name: "Photos"
+        url: "https://photos.dev.box"
+        icon: "di:immich"
+        self_hosted: true
+        default_visible: true
+      - id: paperless
+        name: "Docs"
+        url: "https://docs.dev.box"
+        icon: "di:paperless-ngx"
+        self_hosted: true
+        default_visible: true
+
+  - category: "Bookmarks"
+    items:
+      - id: claude
+        name: "Claude"
+        url: "https://claude.ai"
+        icon: "di:claude-ai"
+        tile_color: "#D97757"
+        default_visible: true
+      - id: reddit
+        name: "Reddit"
+        url: "https://reddit.com"
+        icon: "di:reddit"
+        tile_color: "#FF4500"
+        default_visible: true
+      - id: twitter
+        name: "X"
+        url: "https://x.com"
+        icon: "di:x"
+        tile_color: "#000000"
+        default_visible: true
+
+search:
+  enabled: true
+  url: "https://www.google.com/search"
+  param: "q"
+
+wallpapers:
+  enabled: true
+  source: "gitlab"
+  count: 326
+
+weather:
+  enabled: false
+
+onboarding:
+  enabled: false
+
+privacy:
+  enabled: false
+
+tips:
+  enabled: false
+
+news:
+  enabled: false
