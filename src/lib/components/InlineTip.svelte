@@ -4,6 +4,7 @@
 	import { prefs } from '$lib/stores/prefs.js';
 	import { resolveIcon } from '$lib/apps.js';
 	import { handleIconError } from '$lib/iconHelpers.js';
+	import AppIcon from '$lib/components/AppIcon.svelte';
 
 	let { onsetup = () => {} } = $props();
 
@@ -87,8 +88,8 @@
 {#if currentTip}
 	<div class="flex items-center justify-center py-4 transition-opacity duration-200 {dismissing ? 'opacity-0' : 'opacity-100'}">
 		<div class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border-card/50 bg-surface-card/30 backdrop-blur-sm max-md:mx-4 max-md:rounded-xl max-md:px-3.5 max-md:py-2">
-		{#if currentTip.icon?.mono}
-			<img src={currentTip.icon.mono} alt="" class="w-3.5 h-3.5 opacity-50 shrink-0 icon-white" onerror={(e) => handleIconError(e, currentTip.icon)} />
+		{#if currentTip.icon}
+			<AppIcon icon={currentTip.icon} name={currentTip.app?.name || ''} size="w-3.5 h-3.5" wrapSize="w-5 h-5" iconStyle="white" wrap className="opacity-50" />
 		{/if}
 		<span class="text-[0.7rem] text-content-muted/80 min-w-0">{currentTip.text}</span>
 

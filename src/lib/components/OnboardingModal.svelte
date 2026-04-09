@@ -5,6 +5,7 @@
 	import { getWallpaperUrl } from '$lib/wallpaper.js';
 	import { resolveIcon } from '$lib/apps.js';
 	import { getIconSrc, getIconClass, handleIconError } from '$lib/iconHelpers.js';
+	import AppIcon from '$lib/components/AppIcon.svelte';
 
 	const siteConfig = getContext('config');
 	const brandName = siteConfig?.branding?.name || 'Hearth';
@@ -230,7 +231,7 @@
 		<div class="bg-surface-modal-card backdrop-blur-[120px] border border-border-modal-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme">
 
 			<!-- Slide content -->
-			<div class="p-8 pb-0 h-[420px] flex flex-col">
+			<div class="p-8 pb-0 h-[420px] flex flex-col overflow-x-hidden">
 				{#key slide}
 				<div class="flex-1 flex flex-col items-center justify-center animate-slide-in overflow-y-auto min-h-0">
 				{#if currentSlideType() === 'welcome'}
@@ -258,15 +259,10 @@
 						<p class="text-content-dim text-[0.75rem] mb-5 text-center">Included with your account — no extra cost</p>
 						<div class="space-y-1">
 							{#each services as svc, i}
-								<div class="flex items-center gap-3 px-2 py-2.5 ">
-									{#if svc.icon?.colored}
-										<img src={svc.icon.colored} alt="" class="w-5 h-5 shrink-0" onerror={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = ''; }} />
-										<span class="w-5 h-5 shrink-0 rounded bg-surface-card-strong text-content-dim text-[0.6rem] font-semibold flex items-center justify-center" style="display:none">{svc.name[0]}</span>
-									{:else}
-										<span class="w-5 h-5 shrink-0 rounded bg-surface-card-strong text-content-dim text-[0.6rem] font-semibold flex items-center justify-center">{svc.name[0]}</span>
-									{/if}
-									<span class="text-[0.8rem] text-content font-medium">{svc.name}</span>
-									{#if svc.desc}<span class="text-[0.7rem] text-content-dim ml-auto shrink-0 text-right max-md:text-[0.6rem]">{svc.desc}</span>{/if}
+								<div class="flex items-center gap-3 px-2 py-2.5 min-w-0 overflow-hidden">
+									<AppIcon icon={svc.icon} name={svc.name} size="w-4 h-4" wrapSize="w-6 h-6" wrap />
+									<span class="text-[0.8rem] text-content font-medium shrink-0">{svc.name}</span>
+									{#if svc.desc}<span class="text-[0.7rem] text-content-dim ml-auto text-right max-md:text-[0.6rem] truncate">{svc.desc}</span>{/if}
 								</div>
 							{/each}
 						</div>
