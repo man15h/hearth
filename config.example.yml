@@ -175,13 +175,15 @@ onboarding:
         - title: "Enable 2FA"
           desc: "Add TOTP to all accounts that support it"
     # - type: list                            # Fully custom list slide (no defaults)
-    #   icon: info                            # Built-in icons: shield, lock, info, wifi, key
+    #   icon: info                            # Any Lucide icon name or direct URL
     #   title: "House Rules"
     #   subtitle: "A few things to know"
+    #   list_icon: arrow-right                # Default icon for items (default: check)
     #   items:
     #     - text: "Be respectful"
     #     - title: "Report issues"
     #       desc: "Contact admin if something breaks"
+    #       icon: alert-circle                # Per-item icon override
     #   footer: "Thanks for being part of the community"
     - type: weather                           # Built-in: location permission prompt
 

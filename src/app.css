@@ -196,17 +196,17 @@ body {
 .theme-light .dot-inactive:hover {
 	background: #a1a1aa;
 }
-.check-mark {
-	color: rgba(74, 222, 128, 0.6);
+.slide-icon {
+	filter: invert(1) opacity(0.7);
 }
-.check-icon {
-	color: #4ade80;
+.theme-light .slide-icon {
+	filter: invert(0) opacity(0.6);
 }
-.theme-light .check-mark {
-	color: rgba(22, 163, 74, 0.8);
+.list-icon {
+	filter: invert(1) opacity(0.4);
 }
-.theme-light .check-icon {
-	color: #16a34a;
+.theme-light .list-icon {
+	filter: invert(0) opacity(0.45);
 }
 
 /* Glass card — Apple-style frosted glass */
