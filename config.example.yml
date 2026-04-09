@@ -156,28 +156,34 @@ weather:
 onboarding:
   enabled: true
   welcome_text: "A self-hosted server for your household. Your data stays on your hardware — no third-party clouds, no tracking, no ads."
-  phishing_domain: "auth.example.com"         # "Only enter credentials at this domain"
-  show_privacy: true                          # Show "Private by Design" slide (default: true)
-  show_security_tips: true                    # Show "Stay Safe Online" slide (default: true)
-  # privacy_claims:                           # If empty, shows generic defaults (see below)
-  #   - text: "Your data lives on **our hardware** — never on third-party clouds"
-  #   - text: "**Encrypted** storage with daily off-site backups"
-  #   - text: "**No tracking**, no ads, no data selling — ever"
-  #   - text: "**SSO with 2FA** across all services"
-  # security_tips:                            # If empty, shows generic defaults (passwords, 2FA, phishing)
-  #   - title: "Use a password manager"
-  #     desc: "Store unique passwords for every site"
-  #   - title: "Enable 2FA"
-  #     desc: "Add TOTP to all accounts that support it"
-  #   - title: "Watch for phishing"
-  #     desc: "Only enter credentials at your auth domain"
   # services:                                 # If empty, auto-derived from apps with self_hosted: true
   #   - name: "Photos"
   #     description: "100 GB storage"
   #     icon: "si:immich"
-  #   - name: "Cloud"
-  #     description: "50 GB storage"
-  #     icon: "si:nextcloud"
+  slides:                                     # Composable slide order — each entry is a slide
+    - type: welcome                           # Built-in: greeting with brand logo
+    - type: services                          # Built-in: shows self-hosted apps list
+    - type: privacy                           # List slide with defaults (shield icon, privacy claims)
+      # Override default items:
+      # items:
+      #   - text: "Your data lives on **our hardware**"
+      #   - text: "**No tracking**, no ads — ever"
+    - type: security                          # List slide with defaults (lock icon, security tips)
+      items:                                  # Override with custom tips
+        - title: "Use a password manager"
+          desc: "Store unique passwords for every site"
+        - title: "Enable 2FA"
+          desc: "Add TOTP to all accounts that support it"
+    # - type: list                            # Fully custom list slide (no defaults)
+    #   icon: info                            # Built-in icons: shield, lock, info, wifi, key
+    #   title: "House Rules"
+    #   subtitle: "A few things to know"
+    #   items:
+    #     - text: "Be respectful"
+    #     - title: "Report issues"
+    #       desc: "Contact admin if something breaks"
+    #   footer: "Thanks for being part of the community"
+    - type: weather                           # Built-in: location permission prompt
 
 # ── Privacy Policy ──────────────────────────────────────────
 # Option A: Use a markdown file (recommended)

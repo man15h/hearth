@@ -11,10 +11,11 @@
 
 	let wallpaperUrl = $state('');
 	let wallpaperLoaded = $state(false);
+	const showWallpaper = $derived(($prefs.theme || 'auto') === 'auto');
 
 	$effect(() => {
 		if (!browser) return;
-		wallpaperUrl = getWallpaperUrl();
+		wallpaperUrl = showWallpaper ? getWallpaperUrl() : '';
 	});
 
 	// Block access until password is changed (first login = no passwordVerified flag)
@@ -37,15 +38,15 @@
 				<img src={wallpaperUrl} alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition-opacity duration-700 {wallpaperLoaded ? 'opacity-100' : 'opacity-0'}" onload={() => wallpaperLoaded = true} />
 			{/if}
 		</div>
-		<div class="fixed inset-0 -z-10 pointer-events-none backdrop-blur-[6px]" style="background: linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.15) 100%);"></div>
+		<div class="fixed inset-0 -z-10 pointer-events-none backdrop-blur-[6px] login-overlay"></div>
 
 		<div class="bg-surface-modal-card backdrop-blur-[80px] border border-border-modal-card rounded-2xl p-8 w-full max-w-[360px] text-center shadow-theme animate-modal-enter">
 			{#if brandLogo}
 				<img src={brandLogo} alt="" class="w-12 h-12 mx-auto mb-4" />
 			{:else}
 				<svg viewBox="4 4 24 24" class="w-12 h-12 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg">
-					<circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/>
-					<circle cx="16" cy="16" r="3" fill="white"/>
+					<circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+					<circle cx="16" cy="16" r="3" fill="currentColor"/>
 				</svg>
 			{/if}
 			<span class="text-[0.65rem] text-content-muted uppercase tracking-[0.2em] mb-3 block">{brandName}</span>
@@ -57,7 +58,7 @@
 			<a
 				href={passwordChangeUrl}
 				style="border: none;"
-				class="block w-full py-3 px-4 rounded-[10px] text-[0.9rem] font-medium font-mono text-center no-underline cursor-pointer transition-[opacity,background] duration-200 bg-white text-zinc-950 mb-2 hover:bg-zinc-200"
+				class="block w-full py-3 px-4 rounded-[10px] text-[0.9rem] font-medium font-mono text-center no-underline cursor-pointer transition-[opacity,background] duration-200 login-btn mb-2"
 			>Reset Password</a>
 
 			<button

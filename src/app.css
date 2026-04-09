@@ -157,6 +157,58 @@ body {
 	color: var(--text);
 }
 
+/* Login/password screen overlay & button — theme-aware */
+.login-overlay {
+	background: linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.15) 100%);
+}
+.theme-light .login-overlay {
+	background: linear-gradient(to right, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.45) 50%, rgba(255,255,255,0.25) 100%);
+}
+.login-btn {
+	background: white;
+	color: #09090b;
+}
+.login-btn:hover:not(:disabled) {
+	background: #e4e4e7;
+}
+.theme-light .login-btn {
+	background: #18181b;
+	color: white;
+}
+.theme-light .login-btn:hover:not(:disabled) {
+	background: #27272a;
+}
+.dot-active {
+	background: #fafafa;
+}
+.dot-inactive {
+	background: #3f3f46;
+}
+.dot-inactive:hover {
+	background: #71717a;
+}
+.theme-light .dot-active {
+	background: #18181b;
+}
+.theme-light .dot-inactive {
+	background: #d4d4d8;
+}
+.theme-light .dot-inactive:hover {
+	background: #a1a1aa;
+}
+.check-mark {
+	color: rgba(74, 222, 128, 0.6);
+}
+.check-icon {
+	color: #4ade80;
+}
+.theme-light .check-mark {
+	color: rgba(22, 163, 74, 0.8);
+}
+.theme-light .check-icon {
+	color: #16a34a;
+}
+
 /* Glass card — Apple-style frosted glass */
 .glass-card {
 	background: rgba(255, 255, 255, 0.06);
