@@ -20,7 +20,7 @@ Most self-hosted dashboards are admin tools: one person configures them, one per
 - **Config-driven fonts** — any Google Font or self-hosted font via `config.yml`
 - **Wallpaper picker** — choose from 326 wallpapers or use daily rotation (Auto theme only)
 - **Password change prompt** — gate that prompts new users to change their default password
-- **Onboarding flow** — configurable slides: services, privacy claims, security tips, weather
+- **Onboarding flow** — composable config-driven slides with built-in types and a generic `list` slide
 - **Setup guides** — step-by-step instructions for connecting to self-hosted services
 - **Inline tips** — subtle setup hints below the app grid, dismissable per user
 - **App store links** — context menu shows iOS/Android download links per app
@@ -166,17 +166,33 @@ Direct URLs also work: `"https://cdn.example.com/icon.svg"`.
 
 ### Onboarding
 
+Onboarding uses a composable `slides` array. Each slide has a `type` — built-in types (`welcome`, `services`, `weather`) have special behavior, while `privacy`, `security`, and `list` all render through a generic list engine with per-type defaults.
+
 ```yaml
 onboarding:
   enabled: true
   welcome_text: "Your data stays on your hardware."
-  phishing_domain: "auth.example.com"
-  show_privacy: true
-  show_security_tips: true
-  privacy_claims:
-    - text: "Your data lives on **our hardware** — never on third-party clouds"
-    - text: "**No tracking**, no ads, no data selling — ever"
+  slides:
+    - type: welcome                        # greeting with brand logo
+    - type: services                       # auto-derived from self-hosted apps
+    - type: privacy                        # defaults: shield icon, privacy claims
+      items:                               # override default items
+        - text: "Your data lives on **our hardware**"
+        - text: "**No tracking**, no ads — ever"
+    - type: security                       # defaults: lock icon, security tips
+    - type: list                           # fully custom slide (no defaults)
+      icon: info                           # built-in: shield, lock, info, wifi, key
+      title: "House Rules"
+      subtitle: "A few things to know"
+      items:
+        - text: "Be **respectful** to everyone"        # {text} format — supports **bold**
+        - title: "Report issues"                       # {title, desc} format
+          desc: "Contact the admin if something breaks"
+      footer: "Thanks for being here"
+    - type: weather                        # location permission prompt
 ```
+
+All list-based types (`privacy`, `security`, `list`) support: `icon`, `title`, `subtitle`, `items`, `footer`. Items auto-detect format: `{text}` renders with bold markdown, `{title, desc}` renders as **title** — desc. Both formats can coexist in one slide.
 
 ### Optional Features
 
