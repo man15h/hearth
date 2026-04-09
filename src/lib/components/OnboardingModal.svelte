@@ -122,6 +122,7 @@
 		return `https://cdn.jsdelivr.net/npm/lucide-static/icons/${icon}.svg`;
 	}
 
+
 	// Per-type defaults for list-based slides
 	const slideDefaults = {
 		privacy: {
@@ -258,7 +259,8 @@
 						<div class="space-y-1">
 							{#each services as svc, i}
 								<div class="flex items-center gap-3 px-2 py-2.5 ">
-									<img src={svc.icon?.colored || ''} alt="" class="w-5 h-5 shrink-0" onerror={(e) => handleIconError(e, svc.icon)} />
+									<img src={svc.icon?.colored || ''} alt="" class="w-5 h-5 shrink-0" onerror={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = ''; }} />
+									<span class="w-5 h-5 shrink-0 rounded bg-surface-card-strong text-content-dim text-[0.6rem] font-semibold flex items-center justify-center" style="display:none">{svc.name[0]}</span>
 									<span class="text-[0.8rem] text-content font-medium">{svc.name}</span>
 									{#if svc.desc}<span class="text-[0.7rem] text-content-dim ml-auto shrink-0 text-right max-md:text-[0.6rem]">{svc.desc}</span>{/if}
 								</div>
