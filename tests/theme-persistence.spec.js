@@ -190,10 +190,12 @@ test.describe('Onboarding slides - theme applied', () => {
 		const nextBtn = page.locator('button:has-text("Next")');
 		if (await nextBtn.isVisible()) {
 			await nextBtn.click();
+			await page.locator('h2:has-text("What you get")').waitFor({ timeout: 5000 });
 			await page.waitForTimeout(500);
 			await page.screenshot({ path: `${SCREENSHOTS}/15-onboarding-services-light.png`, fullPage: true });
 
 			await nextBtn.click();
+			await page.locator('h2:has-text("Private by Design")').waitFor({ timeout: 5000 });
 			await page.waitForTimeout(500);
 			await page.screenshot({ path: `${SCREENSHOTS}/16-onboarding-privacy-light.png`, fullPage: true });
 		}
