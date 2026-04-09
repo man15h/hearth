@@ -13,7 +13,6 @@
 	const iconStyle = $derived($prefs.iconStyle || 'colored');
 	const onboardingConfig = siteConfig?.onboarding || {};
 	const welcomeText = onboardingConfig.welcome_text || 'Your data stays on your hardware — no third-party clouds, no tracking, no ads.';
-	const phishingDomain = onboardingConfig.phishing_domain || '';
 	const registrationConfig = siteConfig?.auth?.registration;
 	const privacyConfig = siteConfig?.privacy || {};
 	const privacyHtml = privacyConfig.html || null;
@@ -30,10 +29,11 @@
 	let isStandalone = $state(false);
 	let wallpaperUrl = $state('');
 	let wallpaperLoaded = $state(false);
+	const showWallpaper = $derived(($prefs.theme || 'auto') === 'auto');
 
 	$effect(() => {
 		if (!browser) return;
-		wallpaperUrl = getWallpaperUrl();
+		wallpaperUrl = showWallpaper ? getWallpaperUrl() : '';
 	});
 
 	$effect(() => {
@@ -109,44 +109,54 @@
 		{ name: 'Vault', desc: 'Password manager', icon: '/icons/passwords.svg' }
 	];
 
-	// Security tips — configurable or sensible defaults
-	const defaultSecurityTips = [
-		{ title: 'Use strong passwords', desc: 'Use a password manager and never reuse passwords across sites' },
-		{ title: 'Enable 2FA', desc: 'Use a TOTP app like Aegis or Google Authenticator for all your accounts' },
-		{ title: 'Watch for phishing', desc: phishingDomain ? `Only enter credentials at ${phishingDomain}` : 'Only enter credentials at your auth provider' }
-	];
-	const securityTips = onboardingConfig.security_tips?.length
-		? onboardingConfig.security_tips
-		: defaultSecurityTips;
-
-	// Build dynamic slides array based on config
-	const weatherEnabled = siteConfig?.weather?.enabled !== false;
-	// Privacy claims — configurable or sensible defaults
-	const defaultPrivacyClaims = [
-		{ text: 'Your data lives on **our hardware** — never on third-party clouds' },
-		{ text: '**Encrypted** storage with daily off-site backups' },
-		{ text: '**No tracking**, no ads, no data selling — ever' },
-		{ text: '**SSO with 2FA** across all services' }
-	];
-	const privacyClaims = onboardingConfig.privacy_claims?.length
-		? onboardingConfig.privacy_claims
-		: defaultPrivacyClaims;
-
 	function renderBold(text) {
 		return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-content-muted">$1</strong>');
 	}
 
-	const showPrivacy = onboardingConfig.show_privacy !== false;
-	const showSecurityTips = onboardingConfig.show_security_tips !== false;
-	const hasServices = services.length > 0;
+	// Built-in icon map — reuses existing SVGs from the old hardcoded slides
+	const slideIcons = {
+		shield: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" class="text-content-dim"/><path d="M9 12l2 2 4-4" class="check-icon"/></svg>',
+		lock: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" class="text-content-dim"/><path d="M7 11V7a5 5 0 0 1 10 0v4" class="text-content-dim"/><circle cx="12" cy="16.5" r="1.5" fill="currentColor" class="text-content-muted"/></svg>',
+		info: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" class="text-content-dim"/><path d="M12 16v-4m0-4h.01" class="text-content-muted"/></svg>',
+		wifi: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" class="text-content-dim"/></svg>',
+		key: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 0-7.78 7.78 5.5 5.5 0 0 0 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" class="text-content-dim"/></svg>',
+	};
 
-	const slides = [
-		{ type: 'welcome' },
-		...(hasServices ? [{ type: 'services' }] : []),
-		...(showPrivacy ? [{ type: 'privacy' }] : []),
-		...(showSecurityTips ? [{ type: 'security' }] : []),
-		...(weatherEnabled ? [{ type: 'weather' }] : []),
-	];
+	// Per-type defaults for list-based slides
+	const slideDefaults = {
+		privacy: {
+			icon: 'shield',
+			title: 'Private by Design',
+			subtitle: 'How we handle your data',
+			items: [
+				{ text: 'Your data lives on **our hardware** — never on third-party clouds' },
+				{ text: '**Encrypted** storage with daily off-site backups' },
+				{ text: '**No tracking**, no ads, no data selling — ever' },
+				{ text: '**One login** for everything — secured with **two-factor authentication**' }
+			]
+		},
+		security: {
+			icon: 'lock',
+			title: 'Stay Safe Online',
+			subtitle: 'Tips to protect your accounts',
+			items: [
+				{ title: 'Use strong passwords', desc: 'Use a password manager and never reuse passwords across sites' },
+				{ title: 'Enable 2FA', desc: 'Use a TOTP app like Aegis or Google Authenticator for all your accounts' },
+				{ title: 'Watch for phishing', desc: 'Only enter credentials at your auth provider' }
+			]
+		}
+	};
+
+	// Build slides from config — merge with type defaults for list-based slides
+	const listTypes = new Set(['privacy', 'security', 'list']);
+	const configSlides = onboardingConfig.slides || [{ type: 'welcome' }, { type: 'services' }, { type: 'weather' }];
+	const slides = configSlides.map(s => {
+		if (listTypes.has(s.type)) {
+			const defaults = slideDefaults[s.type] || {};
+			return { ...defaults, ...s, items: s.items || defaults.items || [] };
+		}
+		return s;
+	});
 
 	const totalSlides = slides.length;
 
@@ -163,14 +173,14 @@
 				<img src={wallpaperUrl} alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition-opacity duration-700 {wallpaperLoaded ? 'opacity-100' : 'opacity-0'}" onload={() => wallpaperLoaded = true} />
 			{/if}
 		</div>
-		<div class="fixed inset-0 -z-10 pointer-events-none backdrop-blur-[6px]" style="background: linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.15) 100%);"></div>
+		<div class="fixed inset-0 -z-10 pointer-events-none backdrop-blur-[6px] login-overlay"></div>
 		<div class="bg-surface-modal-card backdrop-blur-[80px] border border-border-modal-card rounded-2xl p-8 w-full max-w-[360px] text-center shadow-theme animate-modal-enter">
 			{#if brandLogo}
 				<img src={brandLogo} alt="" class="w-12 h-12 mx-auto mb-4" />
 			{:else}
 				<svg viewBox="4 4 24 24" class="w-12 h-12 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg">
-					<circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/>
-					<circle cx="16" cy="16" r="3" fill="white"/>
+					<circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+					<circle cx="16" cy="16" r="3" fill="currentColor"/>
 				</svg>
 			{/if}
 			<span class="text-[0.65rem] text-content-muted uppercase tracking-[0.2em] mb-3 block">{brandName}</span>
@@ -194,7 +204,7 @@
 				</div>
 			{/if}
 			<button
-				class="w-full py-3 px-4 border-none rounded-[10px] text-[0.9rem] font-medium font-mono cursor-pointer transition-[opacity,background] duration-200 bg-white text-zinc-950 mb-2 hover:not-disabled:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed"
+				class="w-full py-3 px-4 border-none rounded-[10px] text-[0.9rem] font-medium font-mono cursor-pointer transition-[opacity,background] duration-200 login-btn mb-2 disabled:opacity-30 disabled:cursor-not-allowed"
 				disabled={!acceptedTerms}
 				onclick={() => window.location.href = devMode ? '/?user=demo' : '/auth/login'}
 			>Sign in</button>
@@ -257,45 +267,33 @@
 						<p class="text-content-dim/50 text-[0.65rem] mt-auto pt-4 text-center">All self-hosted on our hardware. Your data never leaves.</p>
 					</div>
 
-				{:else if currentSlideType() === 'privacy'}
+				{:else if currentSlideType() === 'privacy' || currentSlideType() === 'security' || currentSlideType() === 'list'}
+					{@const s = slides[slide]}
 					<div class="flex flex-col w-full">
-						<div class="flex items-center justify-center mb-4">
-							<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
-								<path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" class="text-content-dim"/>
-								<path d="M9 12l2 2 4-4" class="text-green-400"/>
-							</svg>
-						</div>
-						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Private by Design</h2>
-						<p class="text-content-dim text-[0.75rem] mb-5 text-center">How we handle your data</p>
+						{#if s.icon && slideIcons[s.icon]}
+							<div class="flex items-center justify-center mb-4">
+								{@html slideIcons[s.icon]}
+							</div>
+						{/if}
+						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">{s.title}</h2>
+						{#if s.subtitle}
+							<p class="text-content-dim text-[0.75rem] mb-5 text-center">{s.subtitle}</p>
+						{/if}
 						<div class="space-y-1">
-							{#each privacyClaims as claim, i}
-								<div class="flex gap-3 items-start px-2 py-2.5 ">
-									<span class="text-green-400/60 text-xs mt-0.5 shrink-0">&#10003;</span>
-									<p class="text-content-muted text-[0.8rem] leading-relaxed m-0">{@html renderBold(claim.text)}</p>
+							{#each s.items || [] as item}
+								<div class="flex gap-3 items-start px-2 py-2.5">
+									<span class="check-mark text-xs mt-0.5 shrink-0">&#10003;</span>
+									{#if item.title}
+										<p class="text-content-muted text-[0.8rem] leading-relaxed m-0"><strong class="text-content">{item.title}</strong> — {item.desc}</p>
+									{:else}
+										<p class="text-content-muted text-[0.8rem] leading-relaxed m-0">{@html renderBold(item.text)}</p>
+									{/if}
 								</div>
 							{/each}
 						</div>
-					</div>
-
-				{:else if currentSlideType() === 'security'}
-					<div class="flex flex-col w-full">
-						<div class="flex items-center justify-center mb-4">
-							<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
-								<rect x="3" y="11" width="18" height="11" rx="2" class="text-content-dim"/>
-								<path d="M7 11V7a5 5 0 0 1 10 0v4" class="text-content-dim"/>
-								<circle cx="12" cy="16.5" r="1.5" fill="currentColor" class="text-content-muted"/>
-							</svg>
-						</div>
-						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Stay Safe Online</h2>
-						<p class="text-content-dim text-[0.75rem] mb-5 text-center">Tips to protect your accounts</p>
-						<div class="space-y-1">
-							{#each securityTips as tip, i}
-								<div class="flex gap-3 items-start px-2 py-2.5 ">
-									<span class="text-green-400/60 text-xs mt-0.5 shrink-0">&#10003;</span>
-									<p class="text-content-muted text-[0.8rem] leading-relaxed m-0"><strong class="text-content">{tip.title}</strong> — {tip.desc}</p>
-								</div>
-							{/each}
-						</div>
+						{#if s.footer}
+							<p class="text-content-dim/50 text-[0.65rem] mt-auto pt-4 text-center">{s.footer}</p>
+						{/if}
 					</div>
 
 				{:else if currentSlideType() === 'weather'}
@@ -333,7 +331,7 @@
 				<div class="flex gap-1.5">
 					{#each Array(totalSlides) as _, i}
 						<button
-							class="w-1.5 h-1.5 rounded-full border-none cursor-pointer transition-all duration-200 p-0 {i === slide ? 'bg-zinc-50 w-4' : 'bg-zinc-700 hover:bg-zinc-500'}"
+							class="w-1.5 h-1.5 rounded-full border-none cursor-pointer transition-all duration-200 p-0 {i === slide ? 'dot-active w-4' : 'dot-inactive'}"
 							onclick={() => slide = i}
 						></button>
 					{/each}
@@ -348,7 +346,7 @@
 					>Back</button>
 					{#if slide === totalSlides - 1 && currentSlideType() !== 'weather'}
 					<button
-						class="py-2 px-5 rounded-lg text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 bg-white text-zinc-950 hover:bg-zinc-200"
+						class="py-2 px-5 rounded-lg text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 login-btn"
 						onclick={finish}
 					>Get Started</button>
 					{:else}

@@ -3,17 +3,34 @@ import { browser } from '$app/environment';
 
 const STORAGE_KEY = 'hearth_prefs';
 
+const THEME_KEY = 'hearth_theme';
+const ICON_STYLE_KEY = 'hearth_icon_style';
+
 function loadPrefs() {
 	if (!browser) return {};
 	try {
-		return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+		const prefs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+		// Restore visual prefs from persistent keys if prefs were cleared (e.g. after logout)
+		if (!prefs.theme) {
+			const savedTheme = localStorage.getItem(THEME_KEY);
+			if (savedTheme) prefs.theme = savedTheme;
+		}
+		if (!prefs.iconStyle) {
+			const savedIconStyle = localStorage.getItem(ICON_STYLE_KEY);
+			if (savedIconStyle) prefs.iconStyle = savedIconStyle;
+		}
+		return prefs;
 	} catch {
 		return {};
 	}
 }
 
 function saveLocal(prefs) {
-	if (browser) localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+	if (!browser) return;
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+	// Always persist visual prefs separately so they survive logout
+	if (prefs.theme) localStorage.setItem(THEME_KEY, prefs.theme);
+	if (prefs.iconStyle) localStorage.setItem(ICON_STYLE_KEY, prefs.iconStyle);
 }
 
 let debounceTimer = null;
@@ -53,16 +70,20 @@ function createPrefsStore() {
 		},
 		reset() {
 			if (browser) {
-				// Preserve theme preference across logout for login page
-				try {
-					const p = JSON.parse(localStorage.getItem(STORAGE_KEY));
-					if (p?.theme) localStorage.setItem('hearth_theme', p.theme);
-				} catch {}
 				localStorage.removeItem(STORAGE_KEY);
 				localStorage.removeItem('weather_cache');
 				localStorage.removeItem('weather_location');
+				// hearth_theme and hearth_icon_style intentionally kept — survive logout
 			}
-			_set({});
+			// Restore persisted visual prefs into the empty state
+			const restored = {};
+			if (browser) {
+				const t = localStorage.getItem(THEME_KEY);
+				const i = localStorage.getItem(ICON_STYLE_KEY);
+				if (t) restored.theme = t;
+				if (i) restored.iconStyle = i;
+			}
+			_set(restored);
 		},
 
 		/** Pull prefs from server, merge over localStorage. One-time on mount. */
