@@ -273,17 +273,17 @@
 					<div class="flex flex-col w-full">
 						{#if s.icon}
 							<div class="flex items-center justify-center mb-4">
-								<img src={resolveSlideIcon(s.icon)} alt="" class="w-9 h-9 slide-icon" />
+								<img src={resolveSlideIcon(s.icon)} alt="" class="w-9 h-9 slide-icon" onerror={(e) => e.target.style.display = 'none'} />
 							</div>
 						{/if}
-						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">{s.title}</h2>
+						{#if s.title}<h2 class="text-[1.2rem] font-semibold mb-1 text-center">{s.title}</h2>{/if}
 						{#if s.subtitle}
 							<p class="text-content-dim text-[0.75rem] mb-5 text-center">{s.subtitle}</p>
 						{/if}
 						<div class="space-y-1">
 							{#each s.items || [] as item}
 								<div class="flex gap-3 items-start px-2 py-2.5">
-									<img src={item.icon ? resolveSlideIcon(item.icon) : defaultListIcon} alt="" class="w-3.5 h-3.5 mt-0.5 shrink-0 list-icon" />
+									<img src={item.icon ? resolveSlideIcon(item.icon) : defaultListIcon} alt="" class="w-3.5 h-3.5 mt-0.5 shrink-0 list-icon" onerror={(e) => e.target.style.display = 'none'} />
 									{#if item.title}
 										<p class="text-content-muted text-[0.8rem] leading-relaxed m-0"><strong class="text-content">{item.title}</strong> — {item.desc}</p>
 									{:else}
