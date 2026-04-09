@@ -22,6 +22,7 @@
 	let { data } = $props();
 	let privacyOpen = $state(false);
 	let onboarded = $state(false);
+	let prefsSynced = $state(false);
 	let guideApp = $state(null);
 	let menuOpen = $state(false);
 	let manageAppsOpen = $state(false);
@@ -63,17 +64,22 @@
 		prefs.reset();
 	}
 
-	// Sync auth info into prefs on every authenticated load
+	// Sync auth info into prefs on every authenticated load — wait for server state before rendering
 	if (browser && loggedIn) {
-		prefs.update((p) => {
-			return { ...p, name: data.authName, username: data.authUsername, firstLoginAt: p.firstLoginAt || new Date().toISOString() };
-		});
-		prefs.syncFromServer();
-		adminApps.load();
+		(async () => {
+			prefs.update((p) => {
+				return { ...p, name: data.authName, username: data.authUsername, firstLoginAt: p.firstLoginAt || new Date().toISOString() };
+			});
+			await prefs.syncFromServer();
+			prefsSynced = true;
+			adminApps.load();
+		})();
+	} else {
+		prefsSynced = true;
 	}
 
 	$effect(() => {
-		if (!onboardingEnabled || !authEnabled || $prefs.onboarded) onboarded = true;
+		if (!onboardingEnabled || !authEnabled || (prefsSynced && $prefs.onboarded)) onboarded = true;
 	});
 
 	// Apply theme class to body
@@ -104,7 +110,7 @@
 {#if authEnabled && !loggedIn}
 	<!-- Login screen (only when auth is enabled) -->
 	<OnboardingModal oncomplete={onOnboardingComplete} authName={data.authName} authUsername={data.authUsername} devMode={data.devMode} />
-{:else if showDashboard}
+{:else if showDashboard && prefsSynced}
 	<!-- Password change gate (only when auth + password_change_url configured) -->
 	{#if authEnabled}
 		<PasswordChangePrompt />

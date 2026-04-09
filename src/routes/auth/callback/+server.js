@@ -26,6 +26,9 @@ export async function GET({ url, cookies }) {
 		});
 	} catch (err) {
 		console.error('[OIDC] Token exchange failed:', err.message);
+		console.error('[OIDC] Expected redirect_uri:', redirectUri);
+		console.error('[OIDC] Actual callback URL:', url.toString());
+		if (err.cause) console.error('[OIDC] Cause:', JSON.stringify(err.cause));
 		error(502, 'Authentication failed. Please try again.');
 	}
 
@@ -35,7 +38,7 @@ export async function GET({ url, cookies }) {
 	let username = claims?.preferred_username || claims?.email?.split('@')[0] || claims?.sub || '';
 	let groups = Array.isArray(claims?.groups) ? claims.groups : [];
 
-	// Try userinfo endpoint for more reliable data (ID token often has only sub/UUID)
+	// Try userinfo endpoint for more complete data
 	try {
 		const userinfo = await client.fetchUserInfo(config, tokens.access_token);
 		if (userinfo.preferred_username) username = userinfo.preferred_username;
