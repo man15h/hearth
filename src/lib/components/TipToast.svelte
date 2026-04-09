@@ -4,6 +4,7 @@
 	import { prefs } from '$lib/stores/prefs.js';
 	import { resolveIcon } from '$lib/apps.js';
 	import { getIconSrc, getIconClass, handleIconError } from '$lib/iconHelpers.js';
+	import AppIcon from '$lib/components/AppIcon.svelte';
 
 	let { onsetup = () => {}, hidden = false, hasTip = $bindable(false), tipData = $bindable(null) } = $props();
 
@@ -114,16 +115,7 @@
 
 			<div class="flex items-start gap-3 pr-4">
 				<!-- Icon -->
-				{#if currentTip.icon?.colored}
-					<img src={getIconSrc(iconStyle, currentTip.icon)} alt="" class="w-7 h-7 opacity-80 shrink-0 mt-0.5 {getIconClass(iconStyle, currentTip.icon)}" onerror={(e) => handleIconError(e, currentTip.icon)} />
-				{:else}
-					<div class="w-7 h-7 shrink-0 mt-0.5 flex items-center justify-center">
-						<svg viewBox="0 0 24 24" class="w-5 h-5 text-content-dim" fill="none" stroke="currentColor" stroke-width="1.5">
-							<circle cx="12" cy="12" r="10" />
-							<path d="M12 16v-4m0-4h.01" />
-						</svg>
-					</div>
-				{/if}
+				<AppIcon icon={currentTip.icon} name={currentTip.app?.name || ''} size="w-5 h-5" wrapSize="w-9 h-9" {iconStyle} wrap className="opacity-80 mt-0.5" />
 
 				<!-- Content -->
 				<div class="flex-1 min-w-0">

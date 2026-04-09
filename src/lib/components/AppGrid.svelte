@@ -4,6 +4,7 @@
 	import { adminApps as adminAppsStore } from '$lib/stores/adminApps.js';
 	import { buildAppsFromConfig, resolveIcon } from '$lib/apps.js';
 	import { getIconSrc, getIconClass, handleIconError, getBrandBgStyle, getBrandIconClass } from '$lib/iconHelpers.js';
+	import AppIcon from '$lib/components/AppIcon.svelte';
 
 	import { browser } from '$app/environment';
 
@@ -215,7 +216,7 @@
 						>
 							<div class="app-icon-wrap w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden shrink-0" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
 								{#key app.id}
-									<img src={iconUrl(app.icon)} alt={app.name} class="w-5 h-5 {iconStyle === 'colored' ? getBrandIconClass(iconStyle, app.icon) : iconClass(app.icon)}" onerror={(e) => handleIconError(e, app.icon)} />
+									<AppIcon icon={app.icon} name={app.name} size="w-5 h-5" {iconStyle} />
 								{/key}
 							</div>
 							<div class="flex flex-col min-w-0">
@@ -252,7 +253,7 @@
 						>
 							<div class="app-icon-wrap w-11 h-11 rounded-[12px] max-md:w-12 max-md:h-12 max-md:rounded-[14px] flex items-center justify-center transition-opacity duration-150 group-hover:opacity-85 relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
 								{#key app.id}
-									<img src={iconUrl(app.icon)} alt={app.name} class="w-6 h-6 max-md:w-7 max-md:h-7 {iconStyle === 'colored' ? getBrandIconClass(iconStyle, app.icon) : iconClass(app.icon)}" onerror={(e) => handleIconError(e, app.icon)} />
+									<AppIcon icon={app.icon} name={app.name} size="w-6 h-6 max-md:w-7 max-md:h-7" {iconStyle} />
 								{/key}
 							</div>
 							<span class="text-[0.65rem] font-medium text-center transition-colors duration-150 group-hover:text-content leading-tight w-full truncate text-content-muted">{app.name}</span>
@@ -313,12 +314,10 @@
 			<div class="p-8 pb-6">
 				<div class="flex items-center gap-3.5 mb-1">
 					<div class="app-icon-wrap w-12 h-12 rounded-[14px] flex items-center justify-center relative overflow-hidden shrink-0">
-						{#if iconStyle === 'colored'}
-							<img src={iconUrl(guideApp.icon)} alt="" class="absolute inset-0 w-full h-full scale-150 blur-xl opacity-40 pointer-events-none" />
-							<img src={iconUrl(guideApp.icon)} alt="" class="w-7 h-7 relative z-10" onerror={(e) => handleIconError(e, guideApp.icon)} />
-						{:else}
-							<img src={iconUrl(guideApp.icon)} alt="" class="w-7 h-7 {iconClass(guideApp.icon)}" onerror={(e) => handleIconError(e, guideApp.icon)} />
+						{#if iconStyle === 'colored' && guideApp.icon?.colored}
+							<img src={guideApp.icon.colored} alt="" class="absolute inset-0 w-full h-full scale-150 blur-xl opacity-40 pointer-events-none" />
 						{/if}
+						<AppIcon icon={guideApp.icon} name={guideApp.name} size="w-7 h-7" {iconStyle} className={iconStyle === 'colored' ? 'relative z-10' : ''} />
 					</div>
 					<div>
 						<h3 class="text-[1.2rem] font-semibold text-content m-0">{guide.title}</h3>
