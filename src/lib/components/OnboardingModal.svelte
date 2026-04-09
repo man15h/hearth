@@ -113,19 +113,19 @@
 		return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-content-muted">$1</strong>');
 	}
 
-	// Built-in icon map — reuses existing SVGs from the old hardcoded slides
-	const slideIcons = {
-		shield: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" class="text-content-dim"/><path d="M9 12l2 2 4-4" class="check-icon"/></svg>',
-		lock: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" class="text-content-dim"/><path d="M7 11V7a5 5 0 0 1 10 0v4" class="text-content-dim"/><circle cx="12" cy="16.5" r="1.5" fill="currentColor" class="text-content-muted"/></svg>',
-		info: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" class="text-content-dim"/><path d="M12 16v-4m0-4h.01" class="text-content-muted"/></svg>',
-		wifi: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" class="text-content-dim"/></svg>',
-		key: '<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 0-7.78 7.78 5.5 5.5 0 0 0 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" class="text-content-dim"/></svg>',
-	};
+	// Resolve icon string to a CDN URL
+	// Supports: "lucide:icon-name", direct URLs, or bare names (treated as lucide)
+	function resolveSlideIcon(icon) {
+		if (!icon) return null;
+		if (icon.startsWith('http')) return icon;
+		if (icon.startsWith('lucide:')) return `https://cdn.jsdelivr.net/npm/lucide-static/icons/${icon.slice(7)}.svg`;
+		return `https://cdn.jsdelivr.net/npm/lucide-static/icons/${icon}.svg`;
+	}
 
 	// Per-type defaults for list-based slides
 	const slideDefaults = {
 		privacy: {
-			icon: 'shield',
+			icon: 'shield-check',
 			title: 'Private by Design',
 			subtitle: 'How we handle your data',
 			items: [
@@ -269,10 +269,11 @@
 
 				{:else if currentSlideType() === 'privacy' || currentSlideType() === 'security' || currentSlideType() === 'list'}
 					{@const s = slides[slide]}
+					{@const defaultListIcon = resolveSlideIcon(s.list_icon || 'check')}
 					<div class="flex flex-col w-full">
-						{#if s.icon && slideIcons[s.icon]}
+						{#if s.icon}
 							<div class="flex items-center justify-center mb-4">
-								{@html slideIcons[s.icon]}
+								<img src={resolveSlideIcon(s.icon)} alt="" class="w-9 h-9 slide-icon" />
 							</div>
 						{/if}
 						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">{s.title}</h2>
@@ -282,7 +283,7 @@
 						<div class="space-y-1">
 							{#each s.items || [] as item}
 								<div class="flex gap-3 items-start px-2 py-2.5">
-									<span class="check-mark text-xs mt-0.5 shrink-0">&#10003;</span>
+									<img src={item.icon ? resolveSlideIcon(item.icon) : defaultListIcon} alt="" class="w-3.5 h-3.5 mt-0.5 shrink-0 list-icon" />
 									{#if item.title}
 										<p class="text-content-muted text-[0.8rem] leading-relaxed m-0"><strong class="text-content">{item.title}</strong> — {item.desc}</p>
 									{:else}

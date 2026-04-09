@@ -181,18 +181,22 @@ onboarding:
         - text: "**No tracking**, no ads — ever"
     - type: security                       # defaults: lock icon, security tips
     - type: list                           # fully custom slide (no defaults)
-      icon: info                           # built-in: shield, lock, info, wifi, key
+      icon: info                           # any Lucide icon name or direct URL
       title: "House Rules"
       subtitle: "A few things to know"
+      list_icon: arrow-right               # default icon for all items (default: check)
       items:
         - text: "Be **respectful** to everyone"        # {text} format — supports **bold**
         - title: "Report issues"                       # {title, desc} format
           desc: "Contact the admin if something breaks"
+          icon: alert-circle                           # per-item icon override
       footer: "Thanks for being here"
     - type: weather                        # location permission prompt
 ```
 
-All list-based types (`privacy`, `security`, `list`) support: `icon`, `title`, `subtitle`, `items`, `footer`. Items auto-detect format: `{text}` renders with bold markdown, `{title, desc}` renders as **title** — desc. Both formats can coexist in one slide.
+All list-based types (`privacy`, `security`, `list`) support: `icon`, `title`, `subtitle`, `items`, `footer`, `list_icon`. Items auto-detect format: `{text}` renders with bold markdown, `{title, desc}` renders as **title** — desc. Both formats can coexist in one slide.
+
+**Icons:** Use any [Lucide](https://lucide.dev/icons) icon by name (e.g., `shield-check`, `lock`, `info`). Direct URLs also work. Browse 1400+ icons at [lucide.dev/icons](https://lucide.dev/icons).
 
 ### Optional Features
 
