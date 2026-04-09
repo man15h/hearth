@@ -377,7 +377,7 @@
 								class="flex items-center gap-3 w-full px-3 py-2 rounded-lg bg-transparent border-none cursor-pointer hover:bg-surface-card-hover transition-colors text-left font-mono"
 								onclick={() => toggle(app.id)}
 							>
-								<AppIcon icon={app.icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" iconStyle="colored" wrap />
+								<AppIcon icon={app.icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 								<span class="text-[0.8rem] text-content-muted flex-1">{app.name}</span>
 								<div class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0 {visibleSet.has(app.id) ? 'bg-surface-toggle-on' : 'bg-surface-toggle-off'}">
 									<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {visibleSet.has(app.id) ? 'translate-x-4' : 'translate-x-0.5'}"></div>
@@ -394,7 +394,7 @@
 						{#each adminApps as app}
 							{@const icon = resolveIcon(app.icon)}
 							<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-card-hover transition-colors">
-								<AppIcon {icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" iconStyle="colored" wrap />
+								<AppIcon {icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 								<span class="text-[0.8rem] text-content-muted flex-1 truncate">{app.name}</span>
 								{#if isAdmin}
 									<button
@@ -431,7 +431,7 @@
 														class="flex items-center gap-2.5 w-full px-3 py-2 bg-transparent border-none cursor-pointer hover:bg-surface-card-hover transition-colors text-left font-mono"
 														onclick={() => selectFromDirectory(entry)}
 													>
-														<AppIcon {icon} name={entry.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" iconStyle="colored" wrap />
+														<AppIcon {icon} name={entry.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 														<span class="text-[0.8rem] text-content-muted flex-1">{entry.name}</span>
 														<span class="text-[0.6rem] text-content-dim">{entry.category}</span>
 													</button>
@@ -448,7 +448,7 @@
 									<div class="flex items-center gap-2">
 										{#if adminNewIcon}
 											{@const icon = resolveIcon(adminNewIcon)}
-											<AppIcon {icon} name={adminNewName} size="w-3.5 h-3.5" wrapSize="w-5 h-5" iconStyle="colored" wrap />
+											<AppIcon {icon} name={adminNewName} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 										{/if}
 										<input type="text" bind:value={adminNewName} placeholder="App name"
 											class="flex-1 bg-surface-input border border-border-input rounded-lg px-3 py-2 text-[0.8rem] text-content font-mono placeholder:text-content-dim outline-none focus:border-border-pill" />
@@ -499,7 +499,7 @@
 					{#each customApps as app}
 						{@const icon = resolveIcon(app.icon)}
 						<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-card-hover transition-colors">
-							<AppIcon {icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" iconStyle="colored" wrap />
+							<AppIcon {icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 							<span class="text-[0.8rem] text-content-muted flex-1 truncate">{app.name}</span>
 							<button
 								class="bg-transparent border-none text-content-dim text-sm cursor-pointer hover:text-red-400 transition-colors p-1"

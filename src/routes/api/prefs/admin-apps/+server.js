@@ -3,11 +3,11 @@ import { getSessionUser, isAdmin } from '$lib/server/session.js';
 import { getAuth } from '$lib/server/config.js';
 import { getAdminApps, addAdminApp } from '$lib/server/db.js';
 
-export function GET({ cookies, url }) {
+export async function GET({ cookies, url }) {
 	const user = getSessionUser(cookies, url);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
-	return json({ adminApps: getAdminApps() });
+	return json({ adminApps: await getAdminApps() });
 }
 
 export async function POST({ cookies, url, request }) {
@@ -38,6 +38,6 @@ export async function POST({ cookies, url, request }) {
 	}
 
 	const id = crypto.randomUUID();
-	addAdminApp({ ...app, id }, user.username);
+	await addAdminApp({ ...app, id }, user.username);
 	return json({ ok: true, id }, { status: 201 });
 }
