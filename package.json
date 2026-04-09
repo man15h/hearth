@@ -26,9 +26,7 @@
     "js-yaml": "^4.1.1",
     "marked": "^17.0.5",
     "openid-client": "^6.8.2",
-    "simple-icons": "^16.15.0"
-  },
-  "optionalDependencies": {
-    "better-sqlite3": "^12.8.0"
+    "simple-icons": "^16.15.0",
+    "sql.js": "^1.14.1"
   }
 }

@@ -156,13 +156,15 @@ weather:
 onboarding:
   enabled: true
   welcome_text: "A self-hosted server for your household. Your data stays on your hardware — no third-party clouds, no tracking, no ads."
-  # services:                                 # If empty, auto-derived from apps with self_hosted: true
-  #   - name: "Photos"
-  #     description: "100 GB storage"
-  #     icon: "si:immich"
+  # services:                                 # Optional: pick specific apps by ID with custom descriptions
+  #   - id: photos                            # References app ID from apps config (icon auto-resolved)
+  #     desc: "100 GB photo backup"           # Optional override (default: setup_guide.subtitle)
+  #   - id: cloud
+  #   - id: vault
+  # If omitted, auto-derived from all apps with self_hosted: true
   slides:                                     # Composable slide order — each entry is a slide
     - type: welcome                           # Built-in: greeting with brand logo
-    - type: services                          # Built-in: shows self-hosted apps list
+    - type: services                          # Built-in: shows services list
     - type: privacy                           # List slide with defaults (shield icon, privacy claims)
       # Override default items:
       # items:

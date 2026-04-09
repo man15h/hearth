@@ -14,6 +14,7 @@
 	const iconStyle = $derived($prefs.iconStyle || 'colored');
 	const onboardingConfig = siteConfig?.onboarding || {};
 	const welcomeText = onboardingConfig.welcome_text || 'Your data stays on your hardware — no third-party clouds, no tracking, no ads.';
+	const slideHeight = onboardingConfig.slide_height || null;
 	const registrationConfig = siteConfig?.auth?.registration;
 	const privacyConfig = siteConfig?.privacy || {};
 	const privacyHtml = privacyConfig.html || null;
@@ -96,19 +97,28 @@
 		}
 	});
 
-	// Derive services from config: use onboarding.services override, or auto-derive from self-hosted apps
-	const configServices = onboardingConfig.services?.length
-		? onboardingConfig.services.map(s => ({ name: s.name, desc: s.description || '', icon: resolveIcon(s.icon) }))
-		: (siteConfig?.apps || [])
-			.flatMap(cat => cat.items || [])
+	// Derive services from apps config — use onboarding.services IDs if defined, otherwise auto-derive
+	const allApps = (siteConfig?.apps || []).flatMap(cat => cat.items || []);
+	const serviceConfig = onboardingConfig.services;
+	const services = serviceConfig?.length
+		? serviceConfig
+			.map(s => {
+				const app = allApps.find(a => a.id === s.id);
+				if (!app) return null;
+				return {
+					name: app.name,
+					desc: s.desc || app.setup_guide?.subtitle || '',
+					icon: resolveIcon(app.icon, app.icon_mono, app.brandColor, app.brandFg, app.brandExplicit)
+				};
+			})
+			.filter(Boolean)
+		: allApps
 			.filter(item => item.self_hosted && !item.admin_only)
-			.map(item => ({ name: item.name, desc: item.setup_guide?.subtitle || '', icon: resolveIcon(item.icon) }));
-
-	const services = configServices.length ? configServices : [
-		{ name: 'Photos', desc: '100 GB storage', icon: '/icons/photos.svg' },
-		{ name: 'Cloud', desc: '50 GB storage', icon: '/icons/cloud.svg' },
-		{ name: 'Vault', desc: 'Password manager', icon: '/icons/passwords.svg' }
-	];
+			.map(item => ({
+				name: item.name,
+				desc: item.setup_guide?.subtitle || '',
+				icon: resolveIcon(item.icon, item.icon_mono, item.brandColor, item.brandFg, item.brandExplicit)
+			}));
 
 	function renderBold(text) {
 		return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-content-muted">$1</strong>');
@@ -231,7 +241,7 @@
 		<div class="bg-surface-modal-card backdrop-blur-[120px] border border-border-modal-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme">
 
 			<!-- Slide content -->
-			<div class="p-8 pb-0 h-[420px] flex flex-col overflow-x-hidden">
+			<div class="p-8 pb-0 flex flex-col overflow-x-hidden {slideHeight ? '' : 'min-h-[200px]'}" style={slideHeight ? `height: ${slideHeight}px` : ''}>
 				{#key slide}
 				<div class="flex-1 flex flex-col items-center justify-center animate-slide-in overflow-y-auto min-h-0">
 				{#if currentSlideType() === 'welcome'}
