@@ -31,9 +31,10 @@
 	});
 </script>
 
-<div class="user-menu fixed bottom-6 right-6 z-[60] max-md:bottom-16 max-md:right-4">
+<!-- Desktop: top-right icon button with popup below -->
+<div class="user-menu hidden md:block fixed top-6 right-6 z-[60]">
 	<button
-		class="w-10 h-10 rounded-[12px] glass-card text-content-muted text-[0.8rem] font-semibold flex items-center justify-center cursor-pointer transition-all duration-200 hover:text-content shadow-theme relative"
+		class="w-9 h-9 rounded-[10px] glass-card text-content-muted text-[0.8rem] font-semibold flex items-center justify-center cursor-pointer transition-all duration-200 hover:text-content shadow-theme"
 		title={name || 'Settings'}
 		onclick={() => open = !open}
 	>
@@ -41,8 +42,7 @@
 	</button>
 
 	{#if open}
-		<!-- Desktop: popup above button -->
-		<div class="max-md:hidden absolute bottom-14 right-0 glass-card rounded-xl overflow-hidden min-w-[180px] animate-menu-up shadow-theme">
+		<div class="absolute top-12 right-0 glass-card rounded-xl overflow-hidden min-w-[180px] animate-menu-up shadow-theme">
 			{#if showAuth && name}
 				<div class="px-4 py-2.5 text-[0.7rem] text-content-dim font-mono uppercase tracking-[0.12em] border-b border-border-card">{name}</div>
 			{/if}
@@ -76,9 +76,21 @@
 			</button>
 			{/if}
 		</div>
+	{/if}
+</div>
 
-		<!-- Mobile: bottom sheet -->
-		<div class="hidden max-md:block fixed inset-0 z-[70]" onclick={() => open = false}>
+<!-- Mobile: bottom-right FAB + bottom sheet -->
+<div class="user-menu md:hidden fixed bottom-16 right-4 z-[60]">
+	<button
+		class="w-10 h-10 rounded-[12px] glass-card text-content-muted text-[0.8rem] font-semibold flex items-center justify-center cursor-pointer transition-all duration-200 hover:text-content shadow-theme relative"
+		title={name || 'Settings'}
+		onclick={() => open = !open}
+	>
+		{buttonLabel}
+	</button>
+
+	{#if open}
+		<div class="fixed inset-0 z-[70]" onclick={() => open = false}>
 			<div class="absolute inset-0 bg-surface-overlay"></div>
 			<div class="absolute bottom-0 left-0 right-0 glass-card rounded-t-2xl animate-slide-up pb-[env(safe-area-inset-bottom,0px)]" onclick={(e) => e.stopPropagation()}>
 				<div class="w-10 h-1 bg-content-dim/30 rounded-full mx-auto mt-3 mb-2"></div>
@@ -119,4 +131,3 @@
 		</div>
 	{/if}
 </div>
-
