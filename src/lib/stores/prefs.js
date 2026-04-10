@@ -5,6 +5,7 @@ const STORAGE_KEY = 'hearth_prefs';
 
 const THEME_KEY = 'hearth_theme';
 const ICON_STYLE_KEY = 'hearth_icon_style';
+const WALLPAPER_KEY = 'hearth_wallpaper';
 
 function loadPrefs() {
 	if (!browser) return {};
@@ -19,6 +20,16 @@ function loadPrefs() {
 			const savedIconStyle = localStorage.getItem(ICON_STYLE_KEY);
 			if (savedIconStyle) prefs.iconStyle = savedIconStyle;
 		}
+		if (!prefs.wallpaperId) {
+			const saved = localStorage.getItem(WALLPAPER_KEY);
+			if (saved) {
+				try {
+					const w = JSON.parse(saved);
+					prefs.wallpaperId = w.id;
+					prefs.wallpaperEnabled = w.enabled;
+				} catch {}
+			}
+		}
 		return prefs;
 	} catch {
 		return {};
@@ -31,6 +42,9 @@ function saveLocal(prefs) {
 	// Always persist visual prefs separately so they survive logout
 	if (prefs.theme) localStorage.setItem(THEME_KEY, prefs.theme);
 	if (prefs.iconStyle) localStorage.setItem(ICON_STYLE_KEY, prefs.iconStyle);
+	if (prefs.wallpaperId !== undefined || prefs.wallpaperEnabled !== undefined) {
+		localStorage.setItem(WALLPAPER_KEY, JSON.stringify({ id: prefs.wallpaperId, enabled: prefs.wallpaperEnabled }));
+	}
 }
 
 let debounceTimer = null;
@@ -80,8 +94,16 @@ function createPrefsStore() {
 			if (browser) {
 				const t = localStorage.getItem(THEME_KEY);
 				const i = localStorage.getItem(ICON_STYLE_KEY);
+				const w = localStorage.getItem(WALLPAPER_KEY);
 				if (t) restored.theme = t;
 				if (i) restored.iconStyle = i;
+				if (w) {
+					try {
+						const wp = JSON.parse(w);
+						restored.wallpaperId = wp.id;
+						restored.wallpaperEnabled = wp.enabled;
+					} catch {}
+				}
 			}
 			_set(restored);
 		},
