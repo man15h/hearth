@@ -20,6 +20,7 @@
 	let theme = $state($prefs.theme || 'auto');
 	let wallpaperEnabled = $state($prefs.wallpaperEnabled !== false);
 	let wallpaperId = $state($prefs.wallpaperId || null);
+	let openInNewTab = $state($prefs.openInNewTab ?? true);
 	let wallpaperPage = $state(0);
 	let enabledWidgets = $state(new Set($prefs.enabledWidgets || ['weather', 'news', 'search']));
 	const WALLPAPERS_PER_PAGE = 12;
@@ -75,6 +76,7 @@
 			theme = $prefs.theme || 'auto';
 			wallpaperEnabled = $prefs.wallpaperEnabled !== false;
 			wallpaperId = $prefs.wallpaperId || null;
+			openInNewTab = $prefs.openInNewTab ?? true;
 			wallpaperPage = wallpaperId ? Math.floor((wallpaperId - 1) / WALLPAPERS_PER_PAGE) : 0;
 			enabledWidgets = new Set($prefs.enabledWidgets || ['weather', 'news', 'search']);
 			customApps = $prefs.customApps || [];
@@ -111,6 +113,11 @@
 		prefs.update(p => ({ ...p, wallpaperEnabled }));
 	}
 
+	function toggleOpenInNewTab() {
+		openInNewTab = !openInNewTab;
+		prefs.update(p => ({ ...p, openInNewTab }));
+	}
+
 	function toggleWidget(id) {
 		const next = new Set(enabledWidgets);
 		if (next.has(id)) next.delete(id);
@@ -130,7 +137,8 @@
 		theme = 'auto';
 		wallpaperEnabled = true;
 		wallpaperId = null;
-		prefs.update(p => ({ ...p, visibleApps: null, iconStyle: 'colored', theme: 'auto', wallpaperEnabled: true, wallpaperId: null, customApps: [] }));
+		openInNewTab = true;
+		prefs.update(p => ({ ...p, visibleApps: null, iconStyle: 'colored', theme: 'auto', wallpaperEnabled: true, wallpaperId: null, openInNewTab: true, customApps: [] }));
 		customApps = [];
 	}
 
@@ -305,6 +313,18 @@
 								onclick={() => setIconStyle(style.id)}
 							>{style.label}</button>
 						{/each}
+					</div>
+				</div>
+
+				<!-- Open apps in new tab -->
+				<div class="mb-4">
+					<div class="flex items-center justify-between">
+						<span class="text-[0.8rem] text-content-muted">Open apps in new tab</span>
+						<button class="bg-transparent border-none cursor-pointer p-0" onclick={toggleOpenInNewTab}>
+							<div class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0 {openInNewTab ? 'bg-surface-toggle-on' : 'bg-surface-toggle-off'}">
+								<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {openInNewTab ? 'translate-x-4' : 'translate-x-0.5'}"></div>
+							</div>
+						</button>
 					</div>
 				</div>
 

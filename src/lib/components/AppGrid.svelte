@@ -26,6 +26,7 @@
 	// Visible app IDs — null means default set
 	const visibleAppIds = $derived($prefs.visibleApps || defaultAppIds);
 	const iconStyle = $derived($prefs.iconStyle || 'colored');
+	const openInNewTab = $derived($prefs.openInNewTab ?? true);
 
 	// Build admin-added apps grouped by category (from server-backed store)
 	const adminCategories = $derived.by(() => {
@@ -210,8 +211,8 @@
 					{#each searchResults as app (app.id)}
 						<a
 							href={app.url}
-							target="_blank"
-							rel="noopener noreferrer"
+							target={openInNewTab ? '_blank' : undefined}
+							rel={openInNewTab ? 'noopener noreferrer' : undefined}
 							class="group flex items-center gap-3 px-3 py-2.5 rounded-xl no-underline hover:bg-surface-card-hover transition-colors"
 						>
 							<div class="app-icon-wrap w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden shrink-0" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
@@ -243,8 +244,8 @@
 					{#each category.apps as app (app.id)}
 						<a
 							href={app.url}
-							target="_blank"
-							rel="noopener noreferrer"
+							target={openInNewTab ? '_blank' : undefined}
+							rel={openInNewTab ? 'noopener noreferrer' : undefined}
 							class="group relative flex flex-col items-center gap-2 no-underline w-full"
 							oncontextmenu={(e) => showContext(app, e)}
 							ontouchstart={(e) => startLongPress(app, e)}
