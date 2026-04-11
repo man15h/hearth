@@ -36,26 +36,39 @@ const adapter = {
 		if (!config?.url || !config?.apiKey) {
 			return { ok: false, message: 'URL and API key are required' };
 		}
+		const base = stripTrailingSlash(config.url);
 		try {
-			const res = await fetch(`${stripTrailingSlash(config.url)}/api/server/ping`, {
+			// /api/server/ping is unauthenticated on Immich — confirms the URL is reachable.
+			const ping = await fetch(`${base}/api/server/ping`, {
+				method: 'GET',
+				headers: { accept: 'application/json' }
+			});
+			if (!ping.ok) {
+				return { ok: false, message: `Server returned ${ping.status} ${ping.statusText}` };
+			}
+
+			// /api/users/me confirms the API key is valid AND has user.read scope.
+			// If the key is missing scopes Immich returns 403 with a helpful message
+			// like "Missing required permission: user.read" — surface that verbatim
+			// so users know exactly which checkbox to enable.
+			const meRes = await fetch(`${base}/api/users/me`, {
 				method: 'GET',
 				headers: { 'x-api-key': config.apiKey, accept: 'application/json' }
 			});
-			if (!res.ok) {
-				return { ok: false, message: `Server returned ${res.status} ${res.statusText}` };
-			}
-			// /api/server/ping returns { res: 'pong' } on success.
-			// We follow up with /api/users/me to confirm the API key is actually valid
-			// (ping is unauthenticated on some Immich versions).
-			const meRes = await fetch(`${stripTrailingSlash(config.url)}/api/users/me`, {
-				method: 'GET',
-				headers: { 'x-api-key': config.apiKey, accept: 'application/json' }
-			});
-			if (meRes.status === 401 || meRes.status === 403) {
-				return { ok: false, message: 'API key rejected by Immich' };
-			}
 			if (!meRes.ok) {
-				return { ok: false, message: `Auth check failed: ${meRes.status}` };
+				const detail = await readImmichError(meRes);
+				if (meRes.status === 401) {
+					return { ok: false, message: detail || 'API key rejected by Immich' };
+				}
+				if (meRes.status === 403) {
+					return {
+						ok: false,
+						message: detail
+							? `${detail}. Re-create your API key in Immich with user.read, asset.read, and asset.view enabled.`
+							: 'API key is missing required permissions. Enable user.read, asset.read, and asset.view in Immich.'
+					};
+				}
+				return { ok: false, message: detail || `Auth check failed: ${meRes.status}` };
 			}
 			const me = await meRes.json().catch(() => null);
 			const who = me?.email || me?.name || 'Immich user';
@@ -96,7 +109,12 @@ const adapter = {
 					results: items.map((asset) => ({
 						id: asset.id,
 						title: asset.originalFileName || asset.id,
-						thumbnail: `${base}/api/assets/${asset.id}/thumbnail?size=preview`,
+						// Browser fetches thumbnails through Hearth so the API key
+						// never reaches the browser. The proxy route resolves the
+						// user's stored config and forwards to Immich with x-api-key.
+						// Using size=thumbnail (256x256, ~20KB) instead of preview
+						// (1080px, ~500KB) — search results are tiny tiles.
+						thumbnail: `/api/integrations/immich/proxy/thumbnail/${encodeURIComponent(asset.id)}?size=thumbnail`,
 						href: `${base}/photos/${asset.id}`,
 						meta: {
 							kind: 'photo',
@@ -108,11 +126,43 @@ const adapter = {
 		}
 	},
 
+	proxy: {
+		// Thumbnail / preview byte-streaming proxy. Browser fetches a Hearth URL
+		// like /api/integrations/immich/proxy/thumbnail/<asset-id>?size=preview
+		// and the server forwards to Immich with the user's stored API key.
+		thumbnail: {
+			defaultCacheControl: 'private, max-age=3600',
+			async fetch({ config, params, request, fetch }) {
+				const base = stripTrailingSlash(config.url);
+				const id = params.path?.[0];
+				if (!id) return new Response('Missing asset id', { status: 400 });
+				const url = new URL(request.url);
+				const size = url.searchParams.get('size') || 'preview';
+				const upstream = `${base}/api/assets/${encodeURIComponent(id)}/thumbnail?size=${encodeURIComponent(size)}`;
+				return fetch(upstream, {
+					method: 'GET',
+					headers: { 'x-api-key': config.apiKey }
+				});
+			}
+		}
+	},
+
 	widgets: {}
 };
 
 function stripTrailingSlash(url) {
 	return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
+// Pull a human-readable error message out of an Immich error response.
+// Immich returns { message, error, statusCode } JSON for API errors.
+async function readImmichError(res) {
+	try {
+		const body = await res.json();
+		return body?.message || body?.error || '';
+	} catch {
+		return '';
+	}
 }
 
 export default adapter;
