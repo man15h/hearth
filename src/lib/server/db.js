@@ -81,6 +81,15 @@ async function ensureInit() {
 			    added_by     TEXT NOT NULL,
 			    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 			  );
+
+			  CREATE TABLE IF NOT EXISTS user_integrations (
+			    username       TEXT NOT NULL,
+			    integration_id TEXT NOT NULL,
+			    config_blob    TEXT NOT NULL DEFAULT '',
+			    surfaces_json  TEXT NOT NULL DEFAULT '{}',
+			    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+			    PRIMARY KEY (username, integration_id)
+			  );
 			`);
 
 			saveToDisk();
@@ -203,6 +212,51 @@ export async function removeAdminApp(id) {
 	// INSERT/UPDATE/DELETE — it's not a monotonic counter you can diff against
 	// an earlier sample, so check directly against 0.
 	const changed = db.getRowsModified() > 0;
+	if (changed) saveToDisk();
+	return changed;
+}
+
+// ─── Integrations (raw rows; encryption handled in store.js) ───────────────
+
+export async function getIntegrationRow(username, integrationId) {
+	await ensureInit();
+	if (!db) return null;
+	return queryOne(
+		'SELECT username, integration_id, config_blob, surfaces_json, updated_at FROM user_integrations WHERE username = ? AND integration_id = ?',
+		[username, integrationId]
+	);
+}
+
+export async function listIntegrationRows(username) {
+	await ensureInit();
+	if (!db) return [];
+	return queryAll(
+		'SELECT username, integration_id, config_blob, surfaces_json, updated_at FROM user_integrations WHERE username = ?',
+		[username]
+	);
+}
+
+export async function upsertIntegrationRow(username, integrationId, configBlob, surfacesJson) {
+	await ensureInit();
+	if (!db) return;
+	db.run(
+		`INSERT INTO user_integrations (username, integration_id, config_blob, surfaces_json, updated_at)
+		 VALUES (?, ?, ?, ?, datetime('now'))
+		 ON CONFLICT(username, integration_id) DO UPDATE SET
+		   config_blob   = excluded.config_blob,
+		   surfaces_json = excluded.surfaces_json,
+		   updated_at    = datetime('now')`,
+		[username, integrationId, configBlob, surfacesJson]
+	);
+	saveToDisk();
+}
+
+export async function deleteIntegrationRow(username, integrationId) {
+	await ensureInit();
+	if (!db) return false;
+	const before = db.getRowsModified();
+	db.run('DELETE FROM user_integrations WHERE username = ? AND integration_id = ?', [username, integrationId]);
+	const changed = db.getRowsModified() > before;
 	if (changed) saveToDisk();
 	return changed;
 }
