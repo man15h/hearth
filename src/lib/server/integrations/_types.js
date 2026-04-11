@@ -42,6 +42,21 @@
  */
 
 /**
+ * @typedef {Object} ProxyHandler
+ * Proxies an authenticated upstream resource through Hearth so the browser
+ * never sees the integration's API key. Used for thumbnails, previews,
+ * downloads — anything that needs to land in an `<img src>` or `<a href>`
+ * without leaking credentials.
+ *
+ * The handler returns a Response (or anything `fetch()`-compatible) and the
+ * generic /api/integrations/:id/proxy/:key/* route streams it back to the
+ * browser with content-type and cache headers preserved.
+ *
+ * @property {(ctx: { config: object, params: Record<string,string>, request: Request, fetch: typeof fetch }) => Promise<Response>} fetch
+ * @property {string} [defaultCacheControl]                    Cache-Control header to set if upstream doesn't provide one
+ */
+
+/**
  * @typedef {Object} IntegrationAdapter
  * @property {string} id                                       Must match the config.yml key
  * @property {string} name                                     Display name
@@ -50,6 +65,7 @@
  * @property {ConfigField[]} configSchema                      Fields rendered in the connect form
  * @property {(ctx: { config: object, fetch: typeof fetch }) => Promise<TestResult>} test
  * @property {Record<string, SearchProvider>} [searchProviders]
+ * @property {Record<string, ProxyHandler>} [proxy]            Optional proxy handlers keyed by name (e.g. 'thumbnail')
  * @property {Record<string, object>} [widgets]                Reserved — widget rendering is out of scope for this PR
  */
 
