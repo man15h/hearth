@@ -1,0 +1,87 @@
+// Static integration registry.
+//
+// Adapters are imported eagerly so the framework knows about them at boot.
+// `getRegistry()` returns only the ones the operator enabled in config.yml —
+// an integration that isn't listed (or is listed with enabled: false) is
+// invisible to users entirely. This is the operator gate.
+//
+// To add a new integration: drop a new file in this directory, import it
+// here, push it onto KNOWN_ADAPTERS. Done.
+
+import { getIntegrationsConfig } from '../config.js';
+import immich from './immich.js';
+
+const KNOWN_ADAPTERS = [immich];
+const BY_ID = new Map(KNOWN_ADAPTERS.map((a) => [a.id, a]));
+
+function isEnabled(operatorEntry) {
+	if (operatorEntry == null) return false;
+	if (typeof operatorEntry !== 'object') return false;
+	return operatorEntry.enabled !== false;
+}
+
+/**
+ * Returns enabled adapter metadata + per-integration operator settings.
+ * Used by the API layer to advertise what's available to users.
+ */
+export function getRegistry() {
+	const cfg = getIntegrationsConfig() || {};
+	const out = [];
+	for (const adapter of KNOWN_ADAPTERS) {
+		const operatorEntry = cfg[adapter.id];
+		if (!isEnabled(operatorEntry)) continue;
+		out.push({
+			adapter,
+			operator: operatorEntry,
+			availableSurfaces: deriveAvailableSurfaces(adapter, operatorEntry)
+		});
+	}
+	return out;
+}
+
+/**
+ * Returns the adapter for a given id, OR null if it's disabled / unknown.
+ * Use this in API handlers to enforce the operator gate.
+ */
+export function getAdapter(id) {
+	const cfg = getIntegrationsConfig() || {};
+	if (!isEnabled(cfg[id])) return null;
+	return BY_ID.get(id) || null;
+}
+
+/**
+ * Returns the operator's settings block for an integration (the value of
+ * `integrations.<id>` in config.yml). Useful for `fromOperatorDefault`
+ * field prefills.
+ */
+export function getOperatorDefaults(id) {
+	const cfg = getIntegrationsConfig() || {};
+	const entry = cfg[id];
+	return isEnabled(entry) ? entry : null;
+}
+
+/**
+ * Returns the list of surface keys an integration is allowed to expose,
+ * intersected with what the operator enabled in config.yml.
+ *
+ * Order: ['search', 'widgets']  — UI renders toggles in this order.
+ */
+function deriveAvailableSurfaces(adapter, operatorEntry) {
+	const operatorSurfaces = (operatorEntry && operatorEntry.surfaces) || {};
+	const out = [];
+	if (
+		adapter.searchProviders &&
+		Object.keys(adapter.searchProviders).length > 0 &&
+		operatorSurfaces.search !== false
+	) {
+		out.push('search');
+	}
+	if (
+		adapter.widgets &&
+		Object.keys(adapter.widgets).length > 0 &&
+		operatorSurfaces.widgets === true
+	) {
+		out.push('widgets');
+	}
+	return out;
+}
