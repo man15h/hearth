@@ -1,0 +1,69 @@
+import { error } from '@sveltejs/kit';
+import { getSessionUser } from '$lib/server/session.js';
+import { getAdapter } from '$lib/server/integrations/index.js';
+import { getConnection } from '$lib/server/integrations/store.js';
+
+// GET /api/integrations/:id/proxy/:key/*
+//
+// Generic byte-streaming proxy. Adapters expose handlers in their `proxy`
+// map (e.g. immich.proxy.thumbnail). The handler returns an upstream
+// Response and we stream it back to the browser with the original
+// content-type. The browser never sees the integration's credentials —
+// they're loaded from the user's encrypted store and stay server-side.
+//
+// Headers preserved from upstream: content-type, content-length, etag,
+// last-modified, cache-control. If upstream omits cache-control we fall
+// back to the handler's defaultCacheControl.
+
+const PASS_THROUGH_HEADERS = [
+	'content-type',
+	'content-length',
+	'etag',
+	'last-modified',
+	'cache-control'
+];
+
+export async function GET({ cookies, url, params, request, fetch }) {
+	const user = getSessionUser(cookies, url);
+	if (!user) throw error(401, 'Unauthorized');
+
+	const adapter = getAdapter(params.id);
+	if (!adapter) throw error(404, 'Unknown integration');
+
+	const handler = adapter.proxy?.[params.key];
+	if (!handler || typeof handler.fetch !== 'function') {
+		throw error(404, 'Unknown proxy handler');
+	}
+
+	const conn = await getConnection(user.username, adapter.id);
+	if (!conn?.connected) throw error(409, 'Integration not connected');
+
+	const segments = (params.path || '').split('/').filter(Boolean);
+
+	let upstream;
+	try {
+		upstream = await handler.fetch({
+			config: conn.config,
+			params: { path: segments },
+			request,
+			fetch
+		});
+	} catch (err) {
+		throw error(502, `Proxy handler failed: ${err.message}`);
+	}
+
+	if (!upstream || typeof upstream.status !== 'number') {
+		throw error(502, 'Proxy handler returned invalid response');
+	}
+
+	const headers = new Headers();
+	for (const name of PASS_THROUGH_HEADERS) {
+		const v = upstream.headers.get(name);
+		if (v) headers.set(name, v);
+	}
+	if (!headers.has('cache-control') && handler.defaultCacheControl) {
+		headers.set('cache-control', handler.defaultCacheControl);
+	}
+
+	return new Response(upstream.body, { status: upstream.status, headers });
+}
