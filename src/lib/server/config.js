@@ -119,6 +119,10 @@ export function getTipsConfig() {
 	return getConfig().tips || { enabled: false };
 }
 
+export function getIntegrationsConfig() {
+	return getConfig().integrations || {};
+}
+
 async function loadPrivacyHtml(config) {
 	const file = config.privacy?.file;
 	if (!file) return null;
