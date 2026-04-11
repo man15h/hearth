@@ -135,10 +135,44 @@ news:
   rss_url: "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
 
 # ── Search Bar ──────────────────────────────────────────────
+# This is the *fallback* web search provider. When no integrations are
+# connected (or the user picks "Web search" in the provider switcher), the
+# search bar form-submits to this URL exactly as it always has. Existing
+# deployments need no changes — leave this alone and Hearth behaves as before.
 search:
   enabled: true
   url: "https://www.google.com/search"        # Search engine URL
   param: "q"                                  # Query parameter name
+
+# ── Integrations ────────────────────────────────────────────
+# Pluggable third-party app adapters (Immich today; Nextcloud, Paperless,
+# Planka, etc. via drop-in adapters in src/lib/server/integrations/).
+#
+# Each integration only appears in user settings if it's listed here. Users
+# then connect to it (paste credentials, hit Test) on a per-account basis;
+# credentials are encrypted at rest with HEARTH_SECRET_KEY.
+#
+# ── Master encryption key ─────────────────────────────────
+# Per-user integration credentials are encrypted at rest with AES-256-GCM.
+# Resolution order:
+#   1. HEARTH_SECRET_KEY env var  — 32 bytes hex or base64. RECOMMENDED for prod.
+#   2. ./data/.integrations-key   — auto-generated on first boot, chmod 0600.
+#
+# Threat model: with the file fallback, the key sits next to the SQLite DB.
+# An attacker who exfiltrates the whole ./data/ directory has both the
+# ciphertext and the key. The env-var path is the only one that protects
+# against whole-data-dir leaks. Set HEARTH_SECRET_KEY in production.
+#
+# Generate one with:
+#   openssl rand -hex 32
+#
+integrations:
+  immich:
+    enabled: true                             # Omit or set false to hide entirely
+    default_url: "https://immich.example.com" # Optional — pre-fills the URL field for users
+    surfaces:                                 # Which surfaces this instance is allowed to power
+      search: true                            # Photo search in the search bar
+      widgets: false                          # Reserved — widget rendering ships in a follow-up
 
 # ── Wallpapers ──────────────────────────────────────────────
 wallpapers:
