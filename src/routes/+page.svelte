@@ -127,7 +127,7 @@
 		</div>
 		{#if searchEnabled}
 			<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:75ms] relative z-30">
-				<SearchBar bind:query={searchQuery} />
+				<SearchBar bind:query={searchQuery} apps={allApps} />
 			</div>
 		{/if}
 		<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:150ms] relative z-20">

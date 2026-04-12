@@ -1,16 +1,24 @@
 <script>
 	import AppIcon from './AppIcon.svelte';
+	import { resolveIcon } from '$lib/apps.js';
 
 	let {
+		apps = [],
 		providers = [],
 		providerResults = {},
 		query = '',
-		webUrl = '',
-		webParam = 'q',
+		searchConfig = {},
 		onclose = () => {}
 	} = $props();
 
-	// Build the per-provider rendering data once per state change.
+	// ── App matches ──────────────────────────────────────────
+	const matchedApps = $derived.by(() => {
+		const q = (query || '').trim().toLowerCase();
+		if (!q || !apps.length) return [];
+		return apps.filter(app => app.name.toLowerCase().includes(q)).slice(0, 5);
+	});
+
+	// ── Integration sections ─────────────────────────────────
 	const sections = $derived(
 		providers.map((p) => {
 			const data = providerResults[p.providerId] || {};
@@ -25,95 +33,164 @@
 		})
 	);
 
-	const anyLoading = $derived(sections.some((s) => s.loading));
-	const anyResults = $derived(sections.some((s) => s.results.length > 0));
+	// ── Web search URL ───────────────────────────────────────
+	const webHref = $derived.by(() => {
+		const url = searchConfig?.url;
+		const param = searchConfig?.param || 'q';
+		if (!url) return '';
+		return `${url}${url.includes('?') ? '&' : '?'}${param}=${encodeURIComponent(query)}`;
+	});
 
-	const webHref = $derived(
-		webUrl ? `${webUrl}${webUrl.includes('?') ? '&' : '?'}${webParam}=${encodeURIComponent(query)}` : ''
-	);
+	// ── Photo row config ─────────────────────────────────────
+	const MAX_PHOTO_TILES = 5;
 </script>
 
 <div class="absolute left-0 right-0 top-full mt-1 bg-surface-modal backdrop-blur-xl border border-border-card rounded-xl overflow-hidden z-20 shadow-theme max-h-[60vh] overflow-y-auto">
+
+	<!-- ═══ APPS SECTION ═══ -->
+	{#if matchedApps.length > 0}
+		<div class="px-4 pt-2.5 pb-1">
+			<span class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">Apps</span>
+		</div>
+		<div class="flex flex-col gap-0.5 px-1.5 pb-1.5">
+			{#each matchedApps as app (app.id)}
+				<a
+					href={app.url}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="group flex items-center gap-3 px-3 py-2 rounded-lg no-underline hover:bg-surface-card-hover transition-colors"
+					onclick={onclose}
+				>
+					<AppIcon icon={app.icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-6 h-6" iconStyle="colored" wrap />
+					<span class="text-[0.8rem] text-content-muted group-hover:text-content transition-colors">{app.name}</span>
+					<span class="ml-auto text-[0.55rem] text-content-dim/40 shrink-0">&nearr;</span>
+				</a>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- ═══ SUGGESTIONS SECTION ═══ -->
+	{#if webHref}
+		<div>
+			<div class="px-4 pt-2.5 pb-1">
+				<span class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">Suggestions</span>
+			</div>
+			<div class="px-1.5 pb-1.5">
+				<a
+					href={webHref}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="group flex items-center gap-3 px-3 py-2 rounded-lg no-underline hover:bg-surface-card-hover transition-colors"
+					onclick={onclose}
+				>
+					{#if searchConfig?.icon}
+						{@const ico = resolveIcon(searchConfig.icon)}
+						<AppIcon icon={ico} name={searchConfig?.name || 'Search'} size="w-3.5 h-3.5" wrapSize="w-6 h-6" iconStyle="colored" wrap />
+					{:else}
+						<div class="w-6 h-6 rounded-[22%] flex items-center justify-center bg-surface-card-strong shrink-0">
+							<svg class="w-3.5 h-3.5 text-content-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+						</div>
+					{/if}
+					<div class="flex flex-col min-w-0">
+						<span class="text-[0.8rem] text-content-muted group-hover:text-content transition-colors">Search for "{query}"</span>
+						<span class="text-[0.6rem] text-content-dim/50 truncate">{searchConfig?.name || 'Web'}</span>
+					</div>
+					<kbd class="ml-auto text-content-muted text-[0.55rem] bg-surface-card-strong py-0.5 px-1.5 rounded border border-border-card font-mono shrink-0">↵</kbd>
+				</a>
+			</div>
+		</div>
+	{/if}
+
+	<!-- ═══ INTEGRATION SECTIONS (Photos, etc.) ═══ -->
 	{#each sections as section (section.provider.providerId)}
-		<div class="border-b border-border-card last:border-b-0">
-			<!-- Section header -->
-			<div class="flex items-center gap-2 px-3 py-2 bg-surface-card/40">
-				<AppIcon icon={section.provider.integrationIcon} name={section.provider.integrationName} size="w-3 h-3" />
-				<span class="text-[0.6rem] font-bold uppercase tracking-[0.15em] text-content-dim">
-					{section.provider.integrationName} {section.provider.label}
-				</span>
-				{#if section.loading}
-					<span class="text-[0.6rem] text-content-dim font-mono ml-1">searching…</span>
-				{:else if section.results.length > 0}
-					<span class="text-[0.6rem] text-content-dim font-mono ml-1">{section.results.length}</span>
+		{#if section.loading || section.error || section.results.length > 0}
+			<div>
+				<div class="px-4 pt-2.5 pb-1 flex items-center gap-2">
+					<span class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">{section.provider.label}</span>
+					{#if section.loading}
+						<span class="text-[0.5rem] text-content-dim font-mono">searching…</span>
+					{/if}
+				</div>
+
+				{#if section.error}
+					<div class="px-4 pb-2.5 text-[0.7rem] text-red-300 font-mono">{section.error}</div>
+				{:else if section.loading}
+					<!-- Label already shows "searching…" -->
+				{:else if section.photoMode}
+					{@const visiblePhotos = section.results.slice(0, MAX_PHOTO_TILES - 1)}
+					{@const remaining = section.results.length - visiblePhotos.length}
+					{@const moreHref = section.provider.searchUrl ? `${section.provider.searchUrl}/search?q=${encodeURIComponent(query)}&type=smart-search` : null}
+					<div class="flex gap-1.5 px-3 pb-2.5 overflow-hidden">
+						{#each visiblePhotos as item (item.id)}
+							<a
+								href={item.href}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="relative w-[100px] h-[100px] shrink-0 rounded-lg overflow-hidden bg-surface-card-strong group"
+								title={item.title}
+								onclick={onclose}
+							>
+								{#if item.thumbnail}
+									<img
+										src={item.thumbnail}
+										alt={item.title}
+										loading="lazy"
+										class="absolute inset-0 w-full h-full object-cover"
+										referrerpolicy="no-referrer"
+									/>
+								{/if}
+								<div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+							</a>
+						{/each}
+
+						{#if remaining > 0}
+							<a
+								href={moreHref || section.results[0]?.href || '#'}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="relative w-[100px] h-[100px] shrink-0 rounded-lg overflow-hidden bg-surface-card-strong group"
+								onclick={onclose}
+							>
+								{#if section.results[MAX_PHOTO_TILES - 1]?.thumbnail}
+									<img
+										src={section.results[MAX_PHOTO_TILES - 1].thumbnail}
+										alt="More results"
+										loading="lazy"
+										class="absolute inset-0 w-full h-full object-cover"
+										referrerpolicy="no-referrer"
+									/>
+								{/if}
+								<div class="absolute inset-0 bg-black/60 flex items-center justify-center">
+									<span class="text-white text-[0.8rem] font-mono font-semibold">+{remaining} more</span>
+								</div>
+							</a>
+						{/if}
+					</div>
+				{:else}
+					<!-- Generic list results -->
+					<div class="flex flex-col gap-0.5 px-1.5 pb-1.5">
+						{#each section.results.slice(0, 5) as item (item.id)}
+							<a
+								href={item.href}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-card-hover transition-colors no-underline"
+								onclick={onclose}
+							>
+								{#if item.thumbnail}
+									<img src={item.thumbnail} alt="" loading="lazy" class="w-8 h-8 rounded object-cover shrink-0" referrerpolicy="no-referrer" />
+								{/if}
+								<div class="flex flex-col min-w-0 flex-1">
+									<span class="text-[0.8rem] text-content font-mono truncate">{item.title}</span>
+									{#if item.subtitle}
+										<span class="text-[0.6rem] text-content-dim/50 truncate">{item.subtitle}</span>
+									{/if}
+								</div>
+							</a>
+						{/each}
+					</div>
 				{/if}
 			</div>
-
-			{#if section.error}
-				<div class="px-3 py-2 text-[0.7rem] text-red-300 font-mono">{section.error}</div>
-			{:else if !section.loading && section.results.length === 0}
-				<div class="px-3 py-2 text-[0.7rem] text-content-dim font-mono">No results</div>
-			{:else if section.photoMode}
-				<!-- Photo grid — small tiles, dense layout. -->
-				<div class="grid grid-cols-6 max-md:grid-cols-4 gap-1 p-2">
-					{#each section.results as item (item.id)}
-						<a
-							href={item.href}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="relative aspect-square rounded-md overflow-hidden bg-surface-card-strong group"
-							title={item.title}
-							onclick={onclose}
-						>
-							{#if item.thumbnail}
-								<img
-									src={item.thumbnail}
-									alt={item.title}
-									loading="lazy"
-									class="absolute inset-0 w-full h-full object-cover"
-									referrerpolicy="no-referrer"
-								/>
-							{/if}
-							<div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors"></div>
-						</a>
-					{/each}
-				</div>
-			{:else}
-				<!-- Generic list -->
-				{#each section.results as item (item.id)}
-					<a
-						href={item.href}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="flex items-center gap-3 px-4 py-2 hover:bg-surface-card-hover transition-colors no-underline"
-						onclick={onclose}
-					>
-						{#if item.thumbnail}
-							<img src={item.thumbnail} alt="" loading="lazy" class="w-8 h-8 rounded object-cover shrink-0" referrerpolicy="no-referrer" />
-						{/if}
-						<span class="text-[0.8rem] text-content font-mono truncate flex-1">{item.title}</span>
-					</a>
-				{/each}
-			{/if}
-		</div>
+		{/if}
 	{/each}
-
-	<!-- Web search footer -->
-	{#if webHref}
-		<a
-			href={webHref}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="flex items-center gap-2 px-4 py-2.5 bg-surface-card/30 hover:bg-surface-card-hover transition-colors no-underline border-t border-border-card"
-			onclick={onclose}
-		>
-			<svg class="w-3.5 h-3.5 text-content-dim shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-			<span class="text-[0.75rem] text-content-dim font-mono flex-1">Search the web for "<span class="text-content-muted">{query}</span>"</span>
-			<kbd class="text-content-muted text-[0.55rem] bg-surface-card-strong py-0.5 px-1.5 rounded border border-border-card font-mono">↵</kbd>
-		</a>
-	{/if}
-
-	{#if !anyResults && !anyLoading && sections.length === 0}
-		<div class="px-4 py-3 text-[0.75rem] text-content-dim font-mono">Type to search…</div>
-	{/if}
 </div>

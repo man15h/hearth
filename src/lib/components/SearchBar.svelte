@@ -6,7 +6,7 @@
 	const siteConfig = getContext('config');
 	const searchConfig = siteConfig?.search || { enabled: true, url: 'https://www.google.com/search', param: 'q' };
 
-	let { query = $bindable('') } = $props();
+	let { query = $bindable(''), apps = [] } = $props();
 	let inputEl;
 	let containerEl;
 
@@ -34,7 +34,8 @@
 					integrationName: it.name,
 					integrationIcon: it.icon,
 					providerKey: key,
-					label: prov.label
+					label: prov.label,
+					searchUrl: it.operatorDefaults?.url || it.userState?.config?.url || null
 				});
 			}
 		}
@@ -162,11 +163,11 @@
 
 	function handleFocus() {
 		ensureIntegrationsLoaded();
-		if (hasInlineProviders) inlineOpen = true;
+		inlineOpen = true;
 	}
 
 	function handleInput() {
-		if (hasInlineProviders) inlineOpen = true;
+		inlineOpen = true;
 	}
 </script>
 
@@ -200,13 +201,13 @@
 		{/if}
 	</form>
 
-	{#if inlineOpen && hasInlineProviders && query.trim()}
+	{#if inlineOpen && query.trim()}
 		<SearchResults
+			{apps}
 			providers={inlineProviders}
 			providerResults={providerResults}
 			query={query}
-			webUrl={searchConfig.url}
-			webParam={searchConfig.param || 'q'}
+			{searchConfig}
 			onclose={closeInline}
 		/>
 	{/if}

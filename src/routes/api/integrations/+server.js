@@ -11,16 +11,15 @@ import { redactConfig, adapterToClient } from '$lib/server/integrations/serializ
 
 export async function GET({ cookies, url }) {
 	const user = getSessionUser(cookies, url);
-	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const registry = getRegistry();
-	const connections = await listConnections(user.username);
+	const connections = user ? await listConnections(user.username) : [];
 	const byId = new Map(connections.map((c) => [c.integrationId, c]));
 
-	const integrations = registry.map(({ adapter, operator, availableSurfaces }) => {
+	const integrations = registry.map(({ adapter, icon, operator, availableSurfaces }) => {
 		const conn = byId.get(adapter.id);
 		return {
-			...adapterToClient(adapter),
+			...adapterToClient(adapter, { icon, name: operator?.name }),
 			operatorDefaults: pickOperatorDefaults(adapter, operator),
 			availableSurfaces,
 			userState: {
