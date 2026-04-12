@@ -17,7 +17,8 @@ function createIntegrationsStore() {
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
 			state.set({ loaded: true, loading: false, integrations: data.integrations || [] });
-		} catch {
+		} catch (err) {
+			console.error('[integrations] fetch failed:', err);
 			state.set({ loaded: true, loading: false, integrations: [] });
 		} finally {
 			inflight = null;

@@ -1,8 +1,12 @@
 <script>
+	import { marked } from 'marked';
 	import AppIcon from './AppIcon.svelte';
 	import { integrations as integrationsStore } from '$lib/stores/integrations.js';
+	import { resolveIcon } from '$lib/apps.js';
 
 	let { integration, iconStyle = 'colored' } = $props();
+
+	const icon = $derived(resolveIcon(integration.icon));
 
 	// Local form state — seeded from server-known values + operator defaults
 	function seedConfig() {
@@ -25,8 +29,8 @@
 
 	let formConfig = $state(seedConfig());
 	let formSurfaces = $state(seedSurfaces());
-	let expanded = $state(!integration.userState?.connected);
-	let testStatus = $state(null); // null | { ok, message }
+	let expanded = $state(false);
+	let testStatus = $state(null);
 	let testing = $state(false);
 	let saving = $state(false);
 	let saveError = $state('');
@@ -56,8 +60,6 @@
 		saving = true;
 		saveError = '';
 		try {
-			// If we haven't tested yet on a fresh connect, run test() first so the
-			// "search auto-on after successful test" rule fires correctly.
 			if (!connected && !testStatus?.ok) {
 				const res = await integrationsStore.test(integration.id, formConfig);
 				testStatus = res;
@@ -66,7 +68,6 @@
 					return;
 				}
 			}
-			// Auto-enable search on first successful save (rule from iter 4).
 			const willConnectFresh = !connected;
 			const surfacesToSave = { ...formSurfaces };
 			if (willConnectFresh && hasSearch && surfacesToSave.search !== false) {
@@ -75,6 +76,7 @@
 			}
 			await integrationsStore.save(integration.id, { config: formConfig, surfaces: surfacesToSave });
 			dirty = false;
+			expanded = false;
 		} catch (err) {
 			saveError = err.message || 'Save failed';
 		} finally {
@@ -98,8 +100,6 @@
 	}
 
 	async function toggleSurface(surface) {
-		// Toggling a surface on a connected integration writes immediately —
-		// no Save button needed because credentials aren't changing.
 		if (!connected) {
 			formSurfaces = { ...formSurfaces, [surface]: !formSurfaces[surface] };
 			return;
@@ -108,44 +108,60 @@
 		formSurfaces = next;
 		try {
 			await integrationsStore.save(integration.id, {
-				config: integration.userState.config, // bullets — server keeps existing
+				config: integration.userState.config,
 				surfaces: next
 			});
 		} catch (err) {
-			// Roll back on failure
 			formSurfaces = { ...formSurfaces, [surface]: !formSurfaces[surface] };
 			saveError = err.message || 'Failed to update surface';
 		}
 	}
+
+	function handleRowClick() {
+		if (!connected) {
+			expanded = !expanded;
+		}
+	}
 </script>
 
-<div class="border border-border-card rounded-xl overflow-hidden bg-surface-card/30">
-	<!-- Header -->
-	<button
-		class="flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none cursor-pointer hover:bg-surface-card-hover transition-colors text-left"
-		onclick={() => (expanded = !expanded)}
+<!-- Row -->
+<div class="bg-transparent">
+	<div
+		class="flex items-center gap-3 px-3 py-2.5 {!connected ? 'cursor-pointer hover:bg-surface-card-hover' : ''} transition-colors"
+		onclick={handleRowClick}
+		role={!connected ? 'button' : undefined}
+		tabindex={!connected ? 0 : undefined}
+		onkeydown={!connected ? (e) => e.key === 'Enter' && handleRowClick() : undefined}
 	>
-		<AppIcon icon={integration.icon} name={integration.name} size="w-3.5 h-3.5" wrapSize="w-6 h-6" {iconStyle} wrap />
+		<AppIcon {icon} name={integration.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 		<div class="flex-1 min-w-0">
-			<div class="text-[0.8rem] text-content font-medium">{integration.name}</div>
-			<div class="text-[0.65rem] text-content-dim truncate">{integration.description}</div>
+			<span class="text-[0.8rem] text-content font-medium">{integration.name}</span>
 		</div>
-		{#if connected}
-			<span class="text-[0.6rem] font-mono uppercase tracking-wider text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-400/30">Connected</span>
-		{:else}
-			<span class="text-[0.6rem] font-mono uppercase tracking-wider text-content-dim px-1.5 py-0.5 rounded border border-border-card">Off</span>
-		{/if}
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-content-dim transition-transform {expanded ? 'rotate-180' : ''}">
-			<polyline points="6 9 12 15 18 9"/>
-		</svg>
-	</button>
+		<div class="flex items-center gap-2">
+			{#if connected}
+				<span class="text-[0.7rem] font-mono text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-400/30 bg-emerald-500/5">Connected</span>
+				<button
+					class="w-7 h-7 rounded-lg border border-border-card bg-transparent text-content-dim cursor-pointer hover:text-content hover:bg-surface-card-hover transition-colors flex items-center justify-center"
+					onclick={(e) => { e.stopPropagation(); expanded = !expanded; }}
+					title="Settings"
+				>
+					<svg viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
+						<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+					</svg>
+				</button>
+			{:else}
+				<span class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card hover:text-content hover:border-border-pill transition-colors">Connect</span>
+			{/if}
+		</div>
+	</div>
 
+	<!-- Expandable config form -->
 	{#if expanded}
-		<div class="px-3 pb-3 pt-1 border-t border-border-card space-y-3">
+		<div class="px-3 pb-3 pt-1 space-y-3 bg-surface-card/20">
 			<!-- Connection form -->
 			<div class="space-y-2">
-				<div class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">Connection</div>
 				{#each integration.configSchema as field}
+					{@const lockedByOperator = field.fromOperatorDefault && integration.operatorDefaults?.[field.key]}
 					<label class="block">
 						<span class="block text-[0.7rem] text-content-dim mb-1">{field.label}{field.required ? ' *' : ''}</span>
 						<input
@@ -153,17 +169,31 @@
 							bind:value={formConfig[field.key]}
 							placeholder={field.placeholder}
 							oninput={markDirty}
-							class="w-full bg-surface-input border border-border-input rounded-lg px-3 py-2 text-[0.8rem] text-content font-mono placeholder:text-content-dim outline-none focus:border-border-pill"
+							readonly={!!lockedByOperator}
+							class="w-full bg-surface-input border border-border-input rounded-lg px-3 py-2 text-[0.8rem] text-content font-mono placeholder:text-content-dim outline-none focus:border-border-pill {lockedByOperator ? 'opacity-60 cursor-not-allowed' : ''}"
 							autocomplete="off"
 							spellcheck="false"
 						/>
-						{#if field.help}
-							<span class="block text-[0.6rem] text-content-dim mt-1">{field.help}</span>
+						{#if lockedByOperator}
+							<span class="block text-[0.6rem] text-content-dim mt-1">Set by your administrator</span>
+						{:else}
+							{#if field.help}
+								<div class="field-help text-[0.6rem] text-content-dim mt-1.5 leading-relaxed">
+									{@html marked.parse(field.help)}
+								</div>
+							{/if}
+							{#if field.helpUrl && formConfig[field.helpUrl.baseKey]}
+								<a
+									href="{formConfig[field.helpUrl.baseKey]}{field.helpUrl.path}"
+									target="_blank"
+									rel="noopener noreferrer"
+									class="inline-block text-[0.6rem] text-blue-400 hover:text-blue-300 mt-1 no-underline hover:underline"
+								>{field.helpUrl.label} ↗</a>
+							{/if}
 						{/if}
 					</label>
 				{/each}
 
-				<!-- Test result -->
 				{#if testStatus}
 					<div class="text-[0.7rem] font-mono px-2 py-1.5 rounded {testStatus.ok ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/10 text-red-300 border border-red-500/30'}">
 						{testStatus.ok ? '✓' : '✗'} {testStatus.message}
@@ -189,7 +219,7 @@
 				</div>
 			</div>
 
-			<!-- Surface toggles — only when operator enabled them -->
+			<!-- Surface toggles -->
 			{#if (hasSearch || hasWidgets) && connected}
 				<div class="space-y-2 pt-2 border-t border-border-card">
 					<div class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">Use for</div>
@@ -226,3 +256,27 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.field-help :global(ol),
+	.field-help :global(ul) {
+		margin: 0.25rem 0;
+		padding-left: 1.2rem;
+	}
+	.field-help :global(li) {
+		margin: 0.1rem 0;
+	}
+	.field-help :global(p) {
+		margin: 0.2rem 0;
+	}
+	.field-help :global(strong) {
+		color: var(--content-muted, #aaa);
+		font-weight: 600;
+	}
+	.field-help :global(code) {
+		font-size: 0.58rem;
+		background: var(--card-bg, rgba(255,255,255,0.05));
+		padding: 0.1rem 0.25rem;
+		border-radius: 3px;
+	}
+</style>

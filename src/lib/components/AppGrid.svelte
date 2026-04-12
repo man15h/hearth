@@ -201,39 +201,7 @@
 
 </script>
 
-<!-- Spotlight search dropdown with scrim over grid -->
-{#if searchResults}
-	<!-- Results card floating above grid, full width to match search bar -->
-	<div class="absolute left-0 right-0 top-0 z-40">
-		<div class="rounded-2xl shadow-theme max-h-[50vh] overflow-y-auto" style="background: var(--modal-bg); border: 1px solid var(--modal-card-border);">
-			{#if searchResults.length > 0}
-				<div class="flex flex-col gap-0.5 p-2">
-					{#each searchResults as app (app.id)}
-						<a
-							href={app.url}
-							target={openInNewTab ? '_blank' : undefined}
-							rel={openInNewTab ? 'noopener noreferrer' : undefined}
-							class="group flex items-center gap-3 px-3 py-2.5 rounded-xl no-underline hover:bg-surface-card-hover transition-colors"
-						>
-							<div class="app-icon-wrap w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden shrink-0" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
-								{#key app.id}
-									<AppIcon icon={app.icon} name={app.name} size="w-5 h-5" {iconStyle} />
-								{/key}
-							</div>
-							<div class="flex flex-col min-w-0">
-								<span class="text-[0.8rem] text-content-muted group-hover:text-content transition-colors">{app.name}</span>
-								<span class="text-[0.65rem] text-content-dim/50 truncate">{app.subtitle || app.url.replace(/^https?:\/\//, '')}</span>
-							</div>
-							<span class="ml-auto text-[0.6rem] text-content-dim/50 shrink-0">&nearr;</span>
-						</a>
-					{/each}
-				</div>
-			{:else}
-				<div class="py-6 text-center text-[0.8rem] text-content-dim">No apps match "{search}"</div>
-			{/if}
-		</div>
-	</div>
-{/if}
+<!-- App search is now handled by SearchResults in the SearchBar dropdown -->
 
 <!-- Normal grid view -->
 <div class="grid grid-cols-3 gap-3.5 mt-4 mb-4 max-lg:grid-cols-2">

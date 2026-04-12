@@ -8,11 +8,21 @@
 // To add a new integration: drop a new file in this directory, import it
 // here, push it onto KNOWN_ADAPTERS. Done.
 
-import { getIntegrationsConfig } from '../config.js';
+import { getIntegrationsConfig, getAppsConfig } from '../config.js';
 import immich from './immich.js';
 
 const KNOWN_ADAPTERS = [immich];
 const BY_ID = new Map(KNOWN_ADAPTERS.map((a) => [a.id, a]));
+
+function resolveApp(id) {
+	const categories = getAppsConfig();
+	for (const cat of categories) {
+		for (const app of cat.items || []) {
+			if (app.id === id) return app;
+		}
+	}
+	return null;
+}
 
 function isEnabled(operatorEntry) {
 	if (operatorEntry == null) return false;
@@ -30,8 +40,11 @@ export function getRegistry() {
 	for (const adapter of KNOWN_ADAPTERS) {
 		const operatorEntry = cfg[adapter.id];
 		if (!isEnabled(operatorEntry)) continue;
+		const app = resolveApp(adapter.id);
 		out.push({
 			adapter,
+			app,
+			icon: app?.icon || adapter.icon || null,
 			operator: operatorEntry,
 			availableSurfaces: deriveAvailableSurfaces(adapter, operatorEntry)
 		});

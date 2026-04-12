@@ -14,6 +14,7 @@
  * @property {boolean} [required]               Defaults to false
  * @property {string} [placeholder]
  * @property {string} [help]                    Small helper text shown under the field
+ * @property {{ baseKey: string, path: string, label: string }} [helpUrl]  Clickable link built from config[baseKey] + path
  * @property {string} [fromOperatorDefault]     If set, the form pre-fills from `integrations.<id>.<value>` in config.yml
  */
 
@@ -27,6 +28,7 @@
  * @typedef {Object} SearchResultItem
  * @property {string} id
  * @property {string} title
+ * @property {string} [subtitle]                Secondary text (e.g. URL, tags, category)
  * @property {string} [thumbnail]               URL of an image; rendered as a tile
  * @property {string} href                      Where to send the user when they click
  * @property {Object} [meta]
@@ -60,7 +62,7 @@
  * @typedef {Object} IntegrationAdapter
  * @property {string} id                                       Must match the config.yml key
  * @property {string} name                                     Display name
- * @property {string} icon                                     Lucide / simple-icons id (e.g. 'di:immich') or full URL
+ * @property {string} [icon]                                   Fallback icon — normally resolved from the app with the same id in config.yml
  * @property {string} description                              One-line summary
  * @property {ConfigField[]} configSchema                      Fields rendered in the connect form
  * @property {(ctx: { config: object, fetch: typeof fetch }) => Promise<TestResult>} test

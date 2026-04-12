@@ -10,7 +10,6 @@
 const adapter = {
 	id: 'immich',
 	name: 'Immich',
-	icon: 'di:immich',
 	description: 'Photo library with smart search',
 
 	configSchema: [
@@ -28,7 +27,8 @@ const adapter = {
 			type: 'secret',
 			label: 'API Key',
 			required: true,
-			help: 'Account Settings → API Keys'
+			help: '1. Open **Account Settings → API Keys**\n2. Click **New API Key** and give it a name\n3. Enable scopes: `user.read`, `asset.read`, `asset.view`\n4. Copy the key and paste it here',
+			helpUrl: { baseKey: 'url', path: '/user-settings?isOpen=api-keys', label: 'Get your API key' }
 		}
 	],
 

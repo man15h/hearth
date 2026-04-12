@@ -8,11 +8,11 @@
 
 const REDACTED = '••••••••';
 
-export function adapterToClient(adapter) {
+export function adapterToClient(adapter, { icon, name } = {}) {
 	return {
 		id: adapter.id,
-		name: adapter.name,
-		icon: adapter.icon,
+		name: name || adapter.name,
+		icon: icon || adapter.icon || null,
 		description: adapter.description,
 		configSchema: (adapter.configSchema || []).map((f) => ({
 			key: f.key,
@@ -21,6 +21,7 @@ export function adapterToClient(adapter) {
 			required: !!f.required,
 			placeholder: f.placeholder || '',
 			help: f.help || '',
+			helpUrl: f.helpUrl || null,
 			fromOperatorDefault: f.fromOperatorDefault || null
 		})),
 		searchProviders: Object.fromEntries(
