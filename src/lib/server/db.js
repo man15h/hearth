@@ -1,5 +1,5 @@
 import initSqlJs from 'sql.js';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from 'fs';
 import { dirname } from 'path';
 import { getConfig } from './config.js';
 
@@ -7,11 +7,28 @@ let db = null;
 let dbPath = null;
 let initPromise = null;
 
+// Serializes async read-modify-write sequences (e.g. mergeUserPrefs) so two
+// concurrent requests on the same key can't lose updates at await boundaries.
+// sql.js itself is synchronous in-memory, so single-statement ops don't need
+// this — only compositions that await between a read and a write do.
+let writeLock = Promise.resolve();
+function withLock(fn) {
+	const run = writeLock.then(() => fn());
+	// Don't poison the chain if fn throws.
+	writeLock = run.catch(() => {});
+	return run;
+}
+
 function saveToDisk() {
 	if (!db || !dbPath) return;
 	try {
 		const data = db.export();
-		writeFileSync(dbPath, Buffer.from(data));
+		// Atomic write: dump to a sibling temp file, then rename over the target.
+		// Rename is atomic on POSIX within the same filesystem, so a crash
+		// mid-write leaves the old DB intact instead of a truncated file.
+		const tmpPath = `${dbPath}.tmp`;
+		writeFileSync(tmpPath, Buffer.from(data));
+		renameSync(tmpPath, dbPath);
 	} catch (err) {
 		console.error('[hearth] Failed to save database:', err.message);
 	}
@@ -121,10 +138,24 @@ export async function upsertUserPrefs(username, prefs) {
 export async function mergeUserPrefs(username, partial) {
 	await ensureInit();
 	if (!db) return partial;
-	const existing = await getUserPrefs(username);
-	const merged = { ...existing, ...partial };
-	await upsertUserPrefs(username, merged);
-	return merged;
+	// Hold the lock across read+merge+write. Everything inside the callback is
+	// synchronous (no awaits), so no other request can interleave once we're in.
+	return withLock(() => {
+		const row = queryOne('SELECT prefs_json FROM user_prefs WHERE username = ?', [username]);
+		let existing = {};
+		if (row) {
+			try { existing = JSON.parse(row.prefs_json); } catch {}
+		}
+		const merged = { ...existing, ...partial };
+		db.run(
+			`INSERT INTO user_prefs (username, prefs_json, updated_at)
+			 VALUES (?, ?, datetime('now'))
+			 ON CONFLICT(username) DO UPDATE SET prefs_json = excluded.prefs_json, updated_at = datetime('now')`,
+			[username, JSON.stringify(merged)]
+		);
+		saveToDisk();
+		return merged;
+	});
 }
 
 export async function getAdminApps() {
@@ -167,9 +198,11 @@ export async function addAdminApp(app, addedBy) {
 export async function removeAdminApp(id) {
 	await ensureInit();
 	if (!db) return false;
-	const before = db.getRowsModified();
 	db.run('DELETE FROM admin_apps WHERE id = ?', [id]);
-	const changed = db.getRowsModified() > before;
+	// getRowsModified() returns the row count from the MOST RECENT
+	// INSERT/UPDATE/DELETE — it's not a monotonic counter you can diff against
+	// an earlier sample, so check directly against 0.
+	const changed = db.getRowsModified() > 0;
 	if (changed) saveToDisk();
 	return changed;
 }
