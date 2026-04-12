@@ -10,8 +10,10 @@
 
 import { getIntegrationsConfig, getAppsConfig } from '../config.js';
 import immich from './immich.js';
+import paperless from './paperless.js';
+import nextcloud from './nextcloud.js';
 
-const KNOWN_ADAPTERS = [immich];
+const KNOWN_ADAPTERS = [immich, paperless, nextcloud];
 const BY_ID = new Map(KNOWN_ADAPTERS.map((a) => [a.id, a]));
 
 function resolveApp(id) {
