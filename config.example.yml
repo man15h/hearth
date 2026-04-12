@@ -135,18 +135,24 @@ news:
   rss_url: "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
 
 # ── Search Bar ──────────────────────────────────────────────
-# This is the *fallback* web search provider. When no integrations are
-# connected (or the user picks "Web search" in the provider switcher), the
-# search bar form-submits to this URL exactly as it always has. Existing
-# deployments need no changes — leave this alone and Hearth behaves as before.
+# The fallback web search provider. Shows in the unified search dropdown as
+# "Suggestions". When the user presses Enter, the query is submitted to this
+# URL in a new tab. Existing deployments need no changes.
 search:
   enabled: true
   url: "https://www.google.com/search"        # Search engine URL
   param: "q"                                  # Query parameter name
+  name: "Google"                              # Shown as subtitle in the search dropdown
+  icon: "di:google"                           # Icon prefix (di:, si:, or full URL)
 
 # ── Integrations ────────────────────────────────────────────
 # Pluggable third-party app adapters (Immich today; Nextcloud, Paperless,
 # Planka, etc. via drop-in adapters in src/lib/server/integrations/).
+#
+# Each key must match both the adapter's `id` AND an app `id` in the apps
+# section above — the integration inherits the app's icon automatically.
+# For example, `integrations.immich` resolves its icon from the app with
+# `id: immich` in the apps list.
 #
 # Each integration only appears in user settings if it's listed here. Users
 # then connect to it (paste credentials, hit Test) on a per-account basis;
@@ -169,7 +175,8 @@ search:
 integrations:
   immich:
     enabled: true                             # Omit or set false to hide entirely
-    default_url: "https://immich.example.com" # Optional — pre-fills the URL field for users
+    name: "Photos"                            # Optional — overrides adapter's default display name
+    default_url: "https://immich.example.com" # Optional — pre-fills & locks the URL field for users
     surfaces:                                 # Which surfaces this instance is allowed to power
       search: true                            # Photo search in the search bar
       widgets: false                          # Reserved — widget rendering ships in a follow-up
