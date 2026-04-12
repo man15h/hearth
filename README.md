@@ -30,7 +30,9 @@ Most self-hosted dashboards are admin tools: one person configures them, one per
 - **Hot reload** — config changes detected automatically, no container restart needed
 - **Weather widget** — Open-Meteo (free, no API key)
 - **News headlines** — any RSS feed
-- **Search bar** — configurable search engine
+- **Integrations** — pluggable app adapters (Immich photo search, more coming) with encrypted per-user credentials
+- **Unified search** — apps, web search, and integration results in one Spotlight-style dropdown
+- **Search bar** — configurable fallback search engine (Google, SearXNG, etc.)
 - **PWA support** — installable as a native app on mobile
 - **Docker** — single container, multi-arch (amd64/arm64)
 
@@ -209,6 +211,17 @@ search:
   enabled: true
   url: "https://www.google.com/search"
   param: "q"
+  name: "Google"
+  icon: "di:google"
+
+integrations:
+  immich:
+    enabled: true
+    name: "Photos"
+    default_url: "https://immich.example.com"
+    surfaces:
+      search: true
+      widgets: false
 
 wallpapers:
   enabled: true
