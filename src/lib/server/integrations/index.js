@@ -12,8 +12,9 @@ import { getIntegrationsConfig, getAppsConfig } from '../config.js';
 import immich from './immich.js';
 import paperless from './paperless.js';
 import nextcloud from './nextcloud.js';
+import planka from './planka.js';
 
-const KNOWN_ADAPTERS = [immich, paperless, nextcloud];
+const KNOWN_ADAPTERS = [immich, paperless, nextcloud, planka];
 const BY_ID = new Map(KNOWN_ADAPTERS.map((a) => [a.id, a]));
 
 function resolveApp(id) {

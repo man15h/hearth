@@ -158,6 +158,11 @@
 	<!-- Expandable config form -->
 	{#if expanded}
 		<div class="px-3 pb-3 pt-1 space-y-3 bg-surface-card/20">
+			{#if integration.tip}
+				<div class="text-[0.65rem] text-content-dim/70 leading-relaxed px-1 py-1.5 rounded bg-surface-card/40 border border-border-card">
+					{integration.tip}
+				</div>
+			{/if}
 			<!-- Connection form -->
 			<div class="space-y-2">
 				{#each integration.configSchema as field}

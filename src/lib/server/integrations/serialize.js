@@ -8,12 +8,13 @@
 
 const REDACTED = '••••••••';
 
-export function adapterToClient(adapter, { icon, name } = {}) {
+export function adapterToClient(adapter, { icon, name, tip } = {}) {
 	return {
 		id: adapter.id,
 		name: name || adapter.name,
 		icon: icon || adapter.icon || null,
 		description: adapter.description,
+		tip: tip || null,
 		configSchema: (adapter.configSchema || []).map((f) => ({
 			key: f.key,
 			type: f.type,
