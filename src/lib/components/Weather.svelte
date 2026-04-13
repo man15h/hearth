@@ -13,7 +13,7 @@
 	<div class="shrink-0 animate-fade-in text-right">
 		<div class="flex items-center gap-2 justify-end">
 			<div class="w-5 h-5 shrink-0 text-content-muted max-md:w-4 max-md:h-4">{@html weatherInfo[0]}</div>
-			<span class="text-[1.5rem] max-md:text-[1.1rem] font-semibold text-content leading-none tracking-tight tabular-nums">
+			<span class="text-[1.5rem] max-md:text-[1.1rem] font-normal text-content leading-none tracking-tight tabular-nums">
 				<AnimatedNumber value={weatherData.temp} />&deg;
 			</span>
 		</div>

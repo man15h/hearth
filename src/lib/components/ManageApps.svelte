@@ -230,22 +230,8 @@
 			class="glass-card rounded-2xl w-full max-w-[620px] h-[520px] max-md:max-w-full max-md:h-[75vh] max-md:rounded-xl overflow-hidden animate-modal-enter shadow-theme relative flex flex-col"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<!-- Header -->
-			<div class="px-6 max-md:px-4 pt-5 max-md:pt-4 pb-3 shrink-0 border-b border-border-card">
-				<div class="flex items-start justify-between">
-					<div>
-						<h3 class="text-[1.05rem] font-semibold text-content m-0">Configure</h3>
-						<p class="text-[0.65rem] text-content-dim m-0 mt-0.5 max-md:hidden">Changes apply live behind this panel</p>
-					</div>
-					<button
-						class="bg-transparent border-none text-content-dim text-xl cursor-pointer leading-none hover:text-content mt-0.5"
-						onclick={() => open = false}
-					>&times;</button>
-				</div>
-			</div>
-
-			<!-- Mobile: horizontal tabs -->
-			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 gap-1 border-b border-border-card overflow-x-auto">
+			<!-- Mobile: horizontal tabs + close -->
+			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 gap-1 border-b border-border-card overflow-x-auto items-center">
 				{#each [
 					{ id: 'appearance', label: 'Appearance' },
 					{ id: 'apps', label: 'Apps' },
@@ -257,12 +243,24 @@
 						onclick={() => activeTab = tab.id}
 					>{tab.label}</button>
 				{/each}
+				<button
+					class="bg-transparent border-none text-content-dim cursor-pointer hover:text-content px-2 py-2 shrink-0"
+					onclick={() => open = false}
+				>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+				</button>
 			</div>
 
 			<!-- Tabbed layout: sidebar (desktop) + content -->
 			<div class="flex flex-1 min-h-0">
 				<!-- Sidebar — hidden on mobile -->
-				<div class="w-[151px] shrink-0 px-2.5 pt-3 pb-3 flex flex-col max-md:hidden">
+				<div class="w-[160px] shrink-0 px-2.5 pt-3 pb-3 flex flex-col max-md:hidden">
+					<button
+						class="bg-transparent border-none text-content-dim cursor-pointer hover:text-content self-end mr-1 mb-2"
+						onclick={() => open = false}
+					>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+					</button>
 					<div class="flex flex-col gap-0.5">
 						{#each [
 							{ id: 'appearance', label: 'Appearance', svg: '<circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v-2M4.22 4.22l1.42 1.42m12.72 12.72-1.42-1.42M1 12h2m18 0h-2M4.22 19.78l1.42-1.42M18.36 5.64l-1.42 1.42"/>' },
@@ -292,6 +290,10 @@
 
 				{#if activeTab === 'appearance'}
 				<!-- ═══ APPEARANCE TAB ═══ -->
+				<div class="mb-4">
+					<div class="text-[0.85rem] font-semibold text-content">Appearance</div>
+					<div class="text-[0.7rem] text-content-dim mt-0.5">Customize how your dashboard looks.</div>
+				</div>
 
 				<!-- Theme -->
 				<div class="mb-5">
@@ -392,6 +394,10 @@
 
 				{:else if activeTab === 'apps'}
 				<!-- ═══ APPS TAB ═══ -->
+				<div class="mb-4">
+					<div class="text-[0.85rem] font-semibold text-content">Apps</div>
+					<div class="text-[0.7rem] text-content-dim mt-0.5">Toggle which apps appear on your dashboard.</div>
+				</div>
 				{#each filteredCategories as category, i}
 					<div class="{i > 0 ? 'mt-4' : ''}">
 						<div class="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">{category.label}</div>
@@ -565,6 +571,10 @@
 
 				{:else if activeTab === 'widgets'}
 				<!-- ═══ WIDGETS TAB ═══ -->
+				<div class="mb-4">
+					<div class="text-[0.85rem] font-semibold text-content">Widgets</div>
+					<div class="text-[0.7rem] text-content-dim mt-0.5">Enable or disable dashboard widgets.</div>
+				</div>
 				{@const widgets = [
 					{ id: 'weather', name: 'Weather', desc: 'Temperature and conditions for your location', icon: '☀️' },
 					{ id: 'news', name: 'News', desc: 'Headlines from your RSS feed', icon: '📰' },

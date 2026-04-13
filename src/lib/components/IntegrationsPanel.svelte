@@ -24,7 +24,7 @@
 			<code class="text-content-muted">integrations:</code> section to <code class="text-content-muted">config.yml</code>.
 		</div>
 	{:else}
-		<div class="border border-border-card rounded-xl overflow-hidden divide-y divide-border-card">
+		<div class="flex flex-col gap-1">
 			{#each $integrationsStore.integrations as integration (integration.id)}
 				<IntegrationCard {integration} {iconStyle} />
 			{/each}

@@ -97,7 +97,7 @@
 <div class="mb-8">
 	<!-- Clock + Weather row -->
 	<div class="flex justify-between items-end">
-		<h1 class="text-[4rem] font-bold text-content tracking-tighter leading-[0.85] max-md:text-[3rem] max-xs:text-[2.5rem] tabular-nums">{formatTime()}</h1>
+		<h1 class="text-[4rem] font-medium text-content tracking-tighter leading-[0.85] max-md:text-[3rem] max-xs:text-[2.5rem] tabular-nums">{formatTime()}</h1>
 		<div class="flex flex-col items-end gap-2">
 			{#if showWeather}<Weather {weatherData} {locationName} />{/if}
 			{#if headlines.length > 0}<NewsPill {headlines} />{/if}

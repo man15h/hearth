@@ -277,6 +277,14 @@ body {
 .wallpaper-active .category-card,
 .wallpaper-active .app-icon-wrap { text-shadow: none; }
 
+/* Soften icon tiles on wallpaper — full-saturation brand icons and bright
+   white tile backgrounds glow against atmospheric wallpapers. This tones
+   down the entire tile (bg + icon) so it integrates with the scene. */
+.wallpaper-active .app-icon-wrap {
+	opacity: 0.75;
+	filter: saturate(0.7);
+}
+
 /* Brand icon filters — theme-independent, always literal white/black */
 .brand-icon-white { filter: brightness(0) invert(1); }
 .brand-icon-black { filter: brightness(0); }
