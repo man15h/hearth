@@ -146,8 +146,8 @@ search:
   icon: "di:google"                           # Icon prefix (di:, si:, or full URL)
 
 # ── Integrations ────────────────────────────────────────────
-# Pluggable third-party app adapters (Immich today; Nextcloud, Paperless,
-# Planka, etc. via drop-in adapters in src/lib/server/integrations/).
+# Pluggable third-party app adapters. Shipped adapters: Immich, Paperless,
+# Nextcloud, Planka, Karakeep. Add more in src/lib/server/integrations/.
 #
 # Each key must match both the adapter's `id` AND an app `id` in the apps
 # section above — the integration inherits the app's icon automatically.
@@ -191,6 +191,20 @@ integrations:
     enabled: true
     name: "Cloud"
     default_url: "https://cloud.example.com"
+    surfaces:
+      search: true
+      widgets: false
+  planka:
+    enabled: true
+    name: "Planka"
+    default_url: "https://planka.example.com"
+    surfaces:
+      search: true
+      widgets: false
+  karakeep:
+    enabled: true
+    name: "Bookmarks"
+    default_url: "https://karakeep.example.com"
     surfaces:
       search: true
       widgets: false
