@@ -129,7 +129,7 @@
 										loading="lazy"
 										class="absolute inset-0 w-full h-full object-cover"
 										referrerpolicy="no-referrer"
-										onerror={hideBrokenThumb}
+										onerror={(e) => showFallbackIcon(e, 'photo')}
 									/>
 								{/if}
 								<div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
@@ -151,7 +151,7 @@
 										loading="lazy"
 										class="absolute inset-0 w-full h-full object-cover"
 										referrerpolicy="no-referrer"
-										onerror={hideBrokenThumb}
+										onerror={(e) => showFallbackIcon(e, 'photo')}
 									/>
 								{/if}
 								<div class="absolute inset-0 bg-black/60 flex items-center justify-center">

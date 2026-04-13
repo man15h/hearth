@@ -117,9 +117,12 @@ const adapter = {
 				} catch {
 					return new Response('Invalid thumbnail reference', { status: 400 });
 				}
-				// If the URL is relative, prepend the Nextcloud base
+				// Resolve relative URLs and validate the target is on the configured host
+				const base = stripTrailingSlash(config.url);
 				if (upstreamUrl.startsWith('/')) {
-					upstreamUrl = stripTrailingSlash(config.url) + upstreamUrl;
+					upstreamUrl = base + upstreamUrl;
+				} else if (!upstreamUrl.startsWith(base)) {
+					return new Response('Thumbnail URL not on configured Nextcloud host', { status: 403 });
 				}
 				return fetch(upstreamUrl, {
 					method: 'GET',
