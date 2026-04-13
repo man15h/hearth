@@ -1,4 +1,5 @@
 <script>
+	import { onMount } from 'svelte';
 	import { marked } from 'marked';
 	import AppIcon from './AppIcon.svelte';
 	import { integrations as integrationsStore } from '$lib/stores/integrations.js';
@@ -8,7 +9,6 @@
 
 	const icon = $derived(resolveIcon(integration.icon));
 
-	// Local form state — seeded from server-known values + operator defaults
 	function seedConfig() {
 		const out = {};
 		for (const f of integration.configSchema) {
@@ -30,6 +30,8 @@
 	let formConfig = $state(seedConfig());
 	let formSurfaces = $state(seedSurfaces());
 	let expanded = $state(false);
+	let contextOpen = $state(false);
+	let menuEl = $state(null);
 	let testStatus = $state(null);
 	let testing = $state(false);
 	let saving = $state(false);
@@ -86,6 +88,7 @@
 
 	async function runDisconnect() {
 		if (!connected) return;
+		contextOpen = false;
 		if (!confirm(`Disconnect ${integration.name}? Stored credentials will be removed.`)) return;
 		saving = true;
 		try {
@@ -94,6 +97,7 @@
 			formSurfaces = seedSurfaces();
 			testStatus = null;
 			dirty = false;
+			expanded = false;
 		} finally {
 			saving = false;
 		}
@@ -122,12 +126,39 @@
 			expanded = !expanded;
 		}
 	}
+
+	function openContext(e) {
+		e.stopPropagation();
+		contextOpen = !contextOpen;
+	}
+
+	function editConnection() {
+		contextOpen = false;
+		expanded = true;
+	}
+
+	// Close context menu on click outside
+	$effect(() => {
+		if (!contextOpen) return;
+		function close(e) {
+			if (menuEl && !menuEl.contains(e.target)) contextOpen = false;
+		}
+		function escape(e) {
+			if (e.key === 'Escape') contextOpen = false;
+		}
+		document.addEventListener('mousedown', close);
+		document.addEventListener('keydown', escape);
+		return () => {
+			document.removeEventListener('mousedown', close);
+			document.removeEventListener('keydown', escape);
+		};
+	});
 </script>
 
-<!-- Row -->
-<div class="bg-transparent">
+<div class="rounded-lg">
+	<!-- Row -->
 	<div
-		class="flex items-center gap-3 px-3 py-2.5 {!connected ? 'cursor-pointer hover:bg-surface-card-hover' : ''} transition-colors"
+		class="flex items-center gap-3 px-3 py-2.5 rounded-lg {!connected ? 'cursor-pointer' : ''} hover:bg-surface-card-hover transition-colors"
 		onclick={handleRowClick}
 		role={!connected ? 'button' : undefined}
 		tabindex={!connected ? 0 : undefined}
@@ -140,30 +171,43 @@
 		<div class="flex items-center gap-2">
 			{#if connected}
 				<span class="text-[0.7rem] font-mono text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-400/30 bg-emerald-500/5">Connected</span>
-				<button
-					class="w-7 h-7 rounded-lg border border-border-card bg-transparent text-content-dim cursor-pointer hover:text-content hover:bg-surface-card-hover transition-colors flex items-center justify-center"
-					onclick={(e) => { e.stopPropagation(); expanded = !expanded; }}
-					title="Settings"
-				>
-					<svg viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
-						<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-					</svg>
-				</button>
+				<div class="relative" bind:this={menuEl}>
+					<button
+						class="w-7 h-7 rounded-lg border border-border-card bg-transparent text-content-dim cursor-pointer hover:text-content hover:bg-surface-card-hover transition-colors flex items-center justify-center"
+						onclick={openContext}
+						title="Options"
+					>
+						<svg viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
+							<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+						</svg>
+					</button>
+					{#if contextOpen}
+						<div class="absolute right-0 top-full mt-1 bg-surface-modal border border-border-card rounded-lg shadow-theme z-50 min-w-[140px] py-1">
+							<button
+								class="w-full px-3 py-1.5 text-left text-[0.75rem] text-content-muted bg-transparent border-none cursor-pointer hover:bg-surface-card-hover transition-colors"
+								onclick={editConnection}
+							>Edit connection</button>
+							<button
+								class="w-full px-3 py-1.5 text-left text-[0.75rem] text-red-400/80 bg-transparent border-none cursor-pointer hover:bg-surface-card-hover transition-colors"
+								onclick={runDisconnect}
+							>Disconnect</button>
+						</div>
+					{/if}
+				</div>
 			{:else}
-				<span class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card hover:text-content hover:border-border-pill transition-colors">Connect</span>
+				<span class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card">Connect</span>
 			{/if}
 		</div>
 	</div>
 
 	<!-- Expandable config form -->
 	{#if expanded}
-		<div class="px-3 pb-3 pt-1 space-y-3 bg-surface-card/20">
+		<div class="px-3 pb-3 pt-1 space-y-3">
 			{#if integration.tip}
-				<div class="text-[0.65rem] text-content-dim/70 leading-relaxed px-1 py-1.5 rounded bg-surface-card/40 border border-border-card">
+				<div class="text-[0.65rem] text-content-dim/70 leading-relaxed px-2 py-1.5 rounded-lg bg-surface-card/40 border border-border-card">
 					{integration.tip}
 				</div>
 			{/if}
-			<!-- Connection form -->
 			<div class="space-y-2">
 				{#each integration.configSchema as field}
 					{@const lockedByOperator = field.fromOperatorDefault && integration.operatorDefaults?.[field.key]}
@@ -247,15 +291,6 @@
 							</div>
 						</div>
 					{/if}
-				</div>
-			{/if}
-
-			{#if connected}
-				<div class="pt-2 border-t border-border-card">
-					<button
-						class="text-[0.65rem] text-red-400/70 bg-transparent border-none cursor-pointer hover:text-red-300 transition-colors font-mono"
-						onclick={runDisconnect}
-					>Remove connection</button>
 				</div>
 			{/if}
 		</div>
