@@ -2,6 +2,7 @@
 //
 // Surfaces:
 //   - searchProviders.files — searches files via OCS Unified Search API
+//
 
 /** @type {import('./_types.js').IntegrationAdapter} */
 const adapter = {
