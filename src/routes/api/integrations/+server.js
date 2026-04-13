@@ -11,6 +11,7 @@ import { redactConfig, adapterToClient } from '$lib/server/integrations/serializ
 
 export async function GET({ cookies, url }) {
 	const user = getSessionUser(cookies, url);
+	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const registry = getRegistry();
 	const connections = user ? await listConnections(user.username) : [];
