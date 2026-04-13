@@ -137,16 +137,29 @@ async function loadPrivacyHtml(config) {
 	}
 }
 
-// Returns a client-safe subset (no secrets)
-export async function getClientConfig() {
+// Returns a client-safe subset (no secrets).
+// When authenticated is false, only returns what the login page needs —
+// branding, auth settings, privacy (for T&C), and wallpaper flag.
+// Everything else (apps, integrations, search, etc.) stays server-side.
+export async function getClientConfig({ authenticated = true } = {}) {
 	const config = getConfig();
+	const auth = {
+		enabled: config.auth?.enabled ?? false,
+		registration: config.auth?.registration || { enabled: false, url: null }
+	};
+
+	if (!authenticated) {
+		return {
+			branding: getBranding(),
+			auth,
+			privacy: { ...getPrivacyConfig(), html: await loadPrivacyHtml(config) },
+			wallpapers: { enabled: config.wallpapers?.enabled ?? false }
+		};
+	}
+
 	return {
 		branding: getBranding(),
-		auth: {
-			enabled: config.auth?.enabled ?? false,
-			password_change_url: config.auth?.password_change_url || null,
-			registration: config.auth?.registration || { enabled: false, url: null }
-		},
+		auth: { ...auth, password_change_url: config.auth?.password_change_url || null },
 		apps: getAppsConfig(),
 		customization: { enabled: config.customization?.enabled ?? false },
 		news: { enabled: config.news?.enabled ?? false },
