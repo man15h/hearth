@@ -25,7 +25,7 @@ const adapter = {
 			label: 'API Token',
 			required: true,
 			help: '1. Open **Settings → Administration**\n2. Scroll to **Auth Tokens**\n3. Click **Add Token** and copy the value',
-			helpUrl: { baseKey: 'url', path: '/admin/', label: 'Open admin panel' }
+			helpUrl: { baseKey: 'url', path: '/dashboard', label: 'Open Paperless settings' }
 		}
 	],
 
