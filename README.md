@@ -30,7 +30,7 @@ Most self-hosted dashboards are admin tools: one person configures them, one per
 - **Hot reload** — config changes detected automatically, no container restart needed
 - **Weather widget** — Open-Meteo (free, no API key)
 - **News headlines** — any RSS feed
-- **Integrations** — pluggable app adapters (Immich photo search, more coming) with encrypted per-user credentials
+- **Integrations** — pluggable app adapters (Immich, Paperless, Nextcloud, Planka, Karakeep) with encrypted per-user credentials
 - **Unified search** — apps, web search, and integration results in one Spotlight-style dropdown
 - **Search bar** — configurable fallback search engine (Google, SearXNG, etc.)
 - **PWA support** — installable as a native app on mobile
@@ -222,6 +222,13 @@ integrations:
     surfaces:
       search: true
       widgets: false
+  karakeep:
+    enabled: true
+    name: "Bookmarks"
+    default_url: "https://karakeep.example.com"
+    surfaces:
+      search: true
+      widgets: false
 
 wallpapers:
   enabled: true
@@ -253,7 +260,7 @@ privacy:
 ## Stack
 
 - [SvelteKit](https://kit.svelte.dev/) + [Tailwind CSS](https://tailwindcss.com/)
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) (optional, WAL mode)
+- [sql.js](https://github.com/sql-js/sql.js) (optional, WASM-based SQLite)
 - [openid-client](https://github.com/panva/node-openid-client) for OIDC
 - [simple-icons](https://github.com/simple-icons/simple-icons) for brand colors
 - [js-yaml](https://github.com/nodeca/js-yaml) for config

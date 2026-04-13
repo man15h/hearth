@@ -20,7 +20,7 @@
 
 	// ── Integration sections ─────────────────────────────────
 	// Sort order: document → file → photo (photos last since they get the grid)
-	const KIND_ORDER = { document: 0, file: 1, card: 2, photo: 3 };
+	const KIND_ORDER = { document: 0, file: 1, card: 2, bookmark: 3, photo: 4 };
 
 	const sections = $derived.by(() => {
 		const raw = providers.map((p) => {
@@ -56,6 +56,7 @@
 		document: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
 		file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
 		card: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7h8"/><path d="M8 11h4"/>',
+		bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
 		photo: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>'
 	};
 
