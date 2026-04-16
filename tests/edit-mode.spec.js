@@ -56,8 +56,10 @@ test.describe('iOS-style edit mode', () => {
 		await page.waitForTimeout(200);
 
 		// Should now appear in the tray.
-		const trayNames = await page.locator('.app-tray .app-tray-item span').allTextContents();
-		expect(trayNames.map(s => s.trim())).toContain(appName);
+		const trayTitles = await page.locator('.app-tray .app-tray-item').evaluateAll(
+			(els) => els.map((e) => e.getAttribute('title'))
+		);
+		expect(trayTitles).toContain(appName);
 
 		// And no longer in the grid.
 		const gridNames = await page.locator('.grid-stack-item a span').allTextContents();
@@ -74,7 +76,7 @@ test.describe('iOS-style edit mode', () => {
 		await page.waitForTimeout(200);
 
 		// Click the tray item → grid gets .picking.
-		const tile = page.locator('.app-tray .app-tray-item', { hasText: appName });
+		const tile = page.locator(`.app-tray .app-tray-item[title="${appName}"]`);
 		await tile.click();
 		await expect(page.locator('.grid-stack.picking')).toHaveCount(1);
 
@@ -84,8 +86,10 @@ test.describe('iOS-style edit mode', () => {
 		await page.waitForTimeout(200);
 
 		// Tray no longer has it; grid has it back.
-		const trayNames = await page.locator('.app-tray .app-tray-item span').allTextContents();
-		expect(trayNames.map(s => s.trim())).not.toContain(appName);
+		const trayTitlesAfter = await page.locator('.app-tray .app-tray-item').evaluateAll(
+			(els) => els.map((e) => e.getAttribute('title'))
+		);
+		expect(trayTitlesAfter).not.toContain(appName);
 		const gridNames = await page.locator('.grid-stack-item a span').allTextContents();
 		expect(gridNames.map(s => s.trim())).toContain(appName);
 	});
@@ -143,7 +147,9 @@ test.describe('iOS-style edit mode', () => {
 		await expect(bookmarksItem.locator('.app-remove-x')).toHaveCount(0);
 
 		// And "GitHubBM" never shows up in the tray.
-		const trayNames = await page.locator('.app-tray .app-tray-item span').allTextContents();
-		expect(trayNames.map(s => s.trim())).not.toContain('GitHubBM');
+		const trayTitles = await page.locator('.app-tray .app-tray-item').evaluateAll(
+			(els) => els.map((e) => e.getAttribute('title'))
+		);
+		expect(trayTitles).not.toContain('GitHubBM');
 	});
 });

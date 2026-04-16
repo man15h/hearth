@@ -119,6 +119,18 @@
 		prefs.update(p => ({ ...p, categoryLayout: defaultLayout }));
 	});
 
+	// Lazily seed `categoryCols` for any rendered category that doesn't
+	// have an entry yet. Intentionally does NOT overwrite existing
+	// entries so app add/remove can't shrink an existing width.
+	$effect(() => {
+		for (const cat of renderCategories) {
+			const catId = slugify(cat.label);
+			if (categoryCols[catId] == null) {
+				categoryCols[catId] = defaultWidth(Math.max(cat.apps.length, 2));
+			}
+		}
+	});
+
 	const renderCategories = $derived.by(() => {
 		// Until the seed effect fires on first render we fall back to
 		// defaultLayout so SSR → hydration has something sensible.
@@ -183,6 +195,14 @@
 	// Cleanup for GridStack-attached listeners (window resize, debounce timer).
 	// Closure-scoped so it survives teardown even if `grid` is nulled first.
 	let cleanupGridListeners = null;
+
+	// Per-category column count (--cols). Seeded lazily via the
+	// $effect below (never from within render, which would loop).
+	// Updated only when the user resizes a tile or when
+	// `applyLayoutForColumn` restores a saved width. Decoupled from
+	// `apps.length` so dropping a new app into a full tile wraps to
+	// a new row instead of squishing icons.
+	let categoryCols = $state({});
 
 	// ── iOS-style edit state ────────────────────────────────────────
 	// When set, every category card pulses and the next category click
@@ -381,6 +401,7 @@
 				grid.update(el, { x: item.x, y: item.y, w: item.w, h: item.h });
 				const inner = el.querySelector('.app-grid-inner');
 				if (inner) inner.style.setProperty('--cols', item.w);
+				categoryCols[item.id] = item.w;
 			}
 		} else {
 			// No saved layout for this breakpoint — recompute widths
@@ -392,6 +413,8 @@
 				const w = Math.min(defaultWidth(appCount, isMobile), cols);
 				grid.update(el, { w });
 				if (inner) inner.style.setProperty('--cols', w);
+				const gsId = el.getAttribute('gs-id');
+				if (gsId) categoryCols[gsId] = w;
 			}
 		}
 		grid.batchUpdate(false);
@@ -454,6 +477,8 @@
 			if (!newW) return;
 			const inner = (el._innerCache ??= el.querySelector('.app-grid-inner'));
 			if (inner) inner.style.setProperty('--cols', newW);
+			const gsId = el.getAttribute('gs-id');
+			if (gsId) categoryCols[gsId] = newW;
 			if (pendingResize.has(el)) return;
 			pendingResize.add(el);
 			requestAnimationFrame(() => {
@@ -469,6 +494,8 @@
 			if (newW) {
 				const inner = (el._innerCache ??= el.querySelector('.app-grid-inner'));
 				if (inner) inner.style.setProperty('--cols', newW);
+				const gsId = el.getAttribute('gs-id');
+				if (gsId) categoryCols[gsId] = newW;
 			}
 			requestAnimationFrame(() => {
 				if (!grid || !el.isConnected) return;
@@ -760,6 +787,7 @@
 						type="button"
 						class="app-tray-item {pickedApp?.id === app.id ? 'app-tray-item-selected' : ''}"
 						aria-label="Move {app.name} to a category"
+						title={app.name}
 						aria-pressed={pickedApp?.id === app.id}
 						draggable="true"
 						ondragstart={(e) => onTrayDragStart(e, app)}
@@ -768,7 +796,6 @@
 						<div class="app-icon-wrap w-10 h-10 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
 							<AppIcon icon={app.icon} name={app.name} size="w-5 h-5" {iconStyle} />
 						</div>
-						<span class="text-[0.6rem] font-medium text-content-muted truncate">{app.name}</span>
 					</button>
 				{/each}
 			{/if}
@@ -783,7 +810,7 @@
 <div bind:this={gridEl} class="grid-stack mb-4 {editMode ? 'grid-edit-mode' : ''} {pickedApp ? 'picking' : ''}">
 	{#each renderCategories as category (category.label)}
 		{@const catId = slugify(category.label)}
-		{@const w = defaultWidth(Math.max(category.apps.length, 2))}
+		{@const w = categoryCols[catId] ?? defaultWidth(Math.max(category.apps.length, 2))}
 		{@const isBookmarks = category.label === 'Bookmarks'}
 		<div class="grid-stack-item"
 			gs-id={catId}
