@@ -303,7 +303,16 @@
 			e.dataTransfer.setData('text/hearth-app', app.id);
 			e.dataTransfer.effectAllowed = 'move';
 		} catch { /* some browsers throw on certain data types */ }
-		// Pre-pick so the category pulse activates while dragging.
+		// Build a proper drag image from the icon wrap inside the button.
+		const iconEl = e.currentTarget.querySelector('.app-icon-wrap');
+		if (iconEl) {
+			const clone = iconEl.cloneNode(true);
+			clone.style.position = 'absolute';
+			clone.style.top = '-9999px';
+			document.body.appendChild(clone);
+			e.dataTransfer.setDragImage(clone, 20, 20);
+			requestAnimationFrame(() => clone.remove());
+		}
 		pickedApp = app;
 		pickedAnchor = e.currentTarget;
 	}
@@ -829,12 +838,21 @@
 				>
 					<legend class="gs-drag-handle text-[0.65rem] text-content-muted tracking-wide px-2">{category.label}</legend>
 					{#if editMode}
-						<div
-							class="edit-overlay"
-							role={pickedApp && !isBookmarks ? 'button' : undefined}
-							aria-label={pickedApp && !isBookmarks ? `Place ${pickedApp.name} in ${category.label}` : undefined}
-							onclick={pickedApp && !isBookmarks ? (e) => { e.stopPropagation(); placeIntoCategory(category.label); } : undefined}
-						></div>
+						{#if pickedApp && !isBookmarks}
+							<div
+								class="drop-overlay"
+								role="button"
+								aria-label="Place {pickedApp.name} in {category.label}"
+								onclick={(e) => { e.stopPropagation(); placeIntoCategory(category.label); }}
+							>
+								<div class="drop-overlay-icon" style={iconStyle === 'colored' ? getBrandBgStyle(pickedApp.icon) : ''}>
+									<AppIcon icon={pickedApp.icon} name={pickedApp.name} size="w-5 h-5" {iconStyle} />
+								</div>
+								<span class="drop-overlay-text">Drop here</span>
+							</div>
+						{:else}
+							<div class="edit-overlay"></div>
+						{/if}
 					{/if}
 					{#if editMode && category.apps.length === 0}
 						<div class="app-grid-empty" aria-hidden="true">Drop here</div>

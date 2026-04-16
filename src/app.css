@@ -439,23 +439,56 @@ body {
 	outline-offset: 2px;
 }
 
-/* Pickup state: accent ring + subtle pulse on every droppable card */
-.picking .category-card:not(:has(legend:empty)) {
-	box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #6ea8fe) 45%, transparent);
-}
+/* Picking state: pulse the dashed border color + show drop overlay. */
 @media (prefers-reduced-motion: no-preference) {
-	.picking .category-card {
-		animation: pickup-pulse 1.8s ease-in-out infinite;
+	.picking .category-card-edit {
+		animation: dash-pulse 1.5s ease-in-out infinite;
 	}
-	@keyframes pickup-pulse {
-		0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #6ea8fe) 25%, transparent); }
-		50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #6ea8fe) 55%, transparent); }
+	@keyframes dash-pulse {
+		0%, 100% { border-color: var(--text-dim); }
+		50%      { border-color: var(--accent, #6ea8fe); }
 	}
 }
 
-/* Stronger ring while an HTML5 drag is hovering */
+/* "Drop here" overlay — shown when a tray app is picked up. */
+.drop-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 15;
+	border-radius: inherit;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	background: rgba(15, 15, 17, 0.7);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	cursor: pointer;
+	pointer-events: auto;
+}
+.drop-overlay-icon {
+	width: 2rem;
+	height: 2rem;
+	border-radius: 8px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.drop-overlay-text {
+	font-size: 0.65rem;
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	color: var(--text-muted);
+	letter-spacing: 0.03em;
+}
+
+/* Stronger highlight while an HTML5 drag is hovering. */
 .drop-target-hover {
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #6ea8fe) 70%, transparent) !important;
+	border-color: var(--accent, #6ea8fe) !important;
+}
+.drop-target-hover .drop-overlay {
+	background: rgba(15, 15, 17, 0.85);
 }
 
 /* Drag handle */
