@@ -120,6 +120,9 @@
 	let gridEl = $state(null);
 	let grid = null;
 	let editMode = $state(false);
+	// Cleanup for GridStack-attached listeners (window resize, debounce timer).
+	// Closure-scoped so it survives teardown even if `grid` is nulled first.
+	let cleanupGridListeners = null;
 
 	function slugify(label) {
 		return label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -202,9 +205,12 @@
 		});
 	}
 
-	async function initGrid() {
+	async function initGrid(isCancelled) {
 		if (!gridEl || grid) return;
 		const { GridStack } = await import('gridstack');
+		// Bail if the component unmounted during the dynamic import
+		// (i.e. on rapid SPA navigation away from the dashboard).
+		if (isCancelled?.() || !gridEl?.isConnected) return;
 
 		grid = GridStack.init({
 			column: 12,
@@ -240,29 +246,37 @@
 		grid.on('dragstop', () => saveLayout());
 		grid.on('resizestop', () => saveLayout());
 
-		// Keep --cols in sync with the tile's live `w` during drag, so icons
-		// reflow into the new column count via pure CSS grid. One CSS var
-		// write per event is effectively free — no Svelte re-render, no
-		// per-app JS. We let sizeToContent recompute height only on stop.
+		// Keep --cols in sync with the tile's live `w` during drag. The CSS
+		// variable write is ~free and runs every event; the expensive
+		// `resizeToContent` (forced layout read + write) is coalesced to
+		// one call per animation frame to avoid layout thrash on weak CPUs.
+		const pendingResize = new WeakSet();
 		grid.on('resize', (_event, el) => {
 			if (!el) return;
 			const newW = el.gridstackNode?.w;
 			if (!newW) return;
-			const inner = el.querySelector('.app-grid-inner');
+			const inner = (el._innerCache ??= el.querySelector('.app-grid-inner'));
 			if (inner) inner.style.setProperty('--cols', newW);
-			// Re-measure content height live so the tile grows/shrinks vertically
-			// as rows are added/removed during the drag.
-			grid.resizeToContent(el);
+			if (pendingResize.has(el)) return;
+			pendingResize.add(el);
+			requestAnimationFrame(() => {
+				pendingResize.delete(el);
+				if (!grid || !el.isConnected) return;
+				grid.resizeToContent(el);
+			});
 		});
 
 		grid.on('resizestop', (_event, el) => {
 			if (!el) return;
 			const newW = el.gridstackNode?.w;
 			if (newW) {
-				const inner = el.querySelector('.app-grid-inner');
+				const inner = (el._innerCache ??= el.querySelector('.app-grid-inner'));
 				if (inner) inner.style.setProperty('--cols', newW);
 			}
-			requestAnimationFrame(() => grid.resizeToContent(el));
+			requestAnimationFrame(() => {
+				if (!grid || !el.isConnected) return;
+				grid.resizeToContent(el);
+			});
 		});
 
 		// Re-apply the per-column saved layout when crossing a breakpoint.
@@ -278,7 +292,7 @@
 			}, 150);
 		};
 		window.addEventListener('resize', onWindowResize);
-		grid._claudeCleanup = () => {
+		cleanupGridListeners = () => {
 			window.removeEventListener('resize', onWindowResize);
 			clearTimeout(resizeTimer);
 		};
@@ -310,13 +324,19 @@
 		};
 		window.addEventListener('click', dismiss);
 
-		// Init GridStack after Svelte has rendered the DOM
-		requestAnimationFrame(() => initGrid());
+		// Init GridStack after Svelte has rendered the DOM.
+		// `cancelled` guards against the component unmounting before either the
+		// outer rAF or the dynamic `import('gridstack')` inside initGrid resolves —
+		// without it we'd wire listeners to a DOM node Svelte already detached.
+		let cancelled = false;
+		requestAnimationFrame(() => { if (!cancelled) initGrid(() => cancelled); });
 
 		return () => {
+			cancelled = true;
 			window.removeEventListener('click', dismiss);
+			cleanupGridListeners?.();
+			cleanupGridListeners = null;
 			if (grid) {
-				grid._claudeCleanup?.();
 				grid.destroy(false);
 				grid = null;
 			}
@@ -382,8 +402,11 @@
 
 	function resetLayout() {
 		if (!grid) return;
-		const isMobile = window.innerWidth < 1024;
-		const maxCols = isMobile ? 4 : 12;
+		// Use gridstack's own column count so this stays in sync if the
+		// columnOpts breakpoints ever shift.
+		const cols = grid.getColumn();
+		const isMobile = cols <= 4;
+		const maxCols = cols;
 
 		const items = grid.getGridItems();
 
@@ -459,7 +482,9 @@
 			}
 		}
 
-		// Apply layout
+		// Apply layout — `y` uses a large row sentinel (rowIdx * 500) so tiles
+		// are placed into distinct gridstack rows during the batch; the final
+		// `compact()` below collapses them down to actual content positions.
 		grid.batchUpdate();
 		for (const cat of cats) {
 			grid.update(cat.el, { x: cat.x, y: cat.rowIdx * 500, w: cat.w, h: 1 });
