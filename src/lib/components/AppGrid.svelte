@@ -63,6 +63,9 @@
 
 	let mounted = $state(false);
 
+	// Legacy render path — used when `prefs.categoryLayout` is not set.
+	// Once the user enters edit mode for the first time we seed
+	// `categoryLayout` from this and the new layout-driven path takes over.
 	const visibleCategories = $derived.by(() => {
 		const filtered = categories
 			.map(cat => ({
@@ -88,12 +91,67 @@
 		return filtered;
 	});
 
-	// Search: flat list of matching apps across all categories
+	// ── Layout-driven render (iOS-style edit mode) ───────────────────
+	// Union of all apps the user *could* place (built-in + admin-added,
+	// bookmarks excluded — they keep their own untouchable category).
+	// Carries each app's *default* category so new-from-config apps
+	// have a home to return to if we ever do full orphan reconciliation.
+	const allApps = $derived.by(() => {
+		const m = new Map();
+		for (const cat of categories) {
+			for (const app of cat.apps) {
+				if (app.adminOnly && !isAdmin) continue;
+				m.set(app.id, { app, defaultCategory: cat.label });
+			}
+		}
+		for (const ac of adminCategories) {
+			for (const app of ac.apps) {
+				m.set(app.id, { app, defaultCategory: ac.label });
+			}
+		}
+		return m;
+	});
+
+	// null ⇒ legacy path; array ⇒ authoritative layout.
+	const categoryLayout = $derived(
+		Array.isArray($prefs.categoryLayout) ? $prefs.categoryLayout : null
+	);
+
+	const renderCategories = $derived.by(() => {
+		if (!categoryLayout) return visibleCategories;
+		const result = [];
+		for (const entry of categoryLayout) {
+			const apps = entry.appIds
+				.map(id => allApps.get(id)?.app)
+				.filter(Boolean);
+			// Keep empty categories around in edit mode so the user can
+			// drop into them; hide them otherwise.
+			if (!apps.length && !editMode) continue;
+			result.push({ label: entry.label, apps });
+		}
+		if (bookmarksCategory) result.push(bookmarksCategory);
+		return result;
+	});
+
+	// Apps not placed anywhere. Empty in legacy mode (no tray then).
+	// New apps added to config land here on first render after a layout
+	// has been seeded — the user decides where to put them.
+	const trayApps = $derived.by(() => {
+		if (!categoryLayout) return [];
+		const placed = new Set(categoryLayout.flatMap(c => c.appIds || []));
+		const out = [];
+		for (const [id, { app }] of allApps) {
+			if (!placed.has(id)) out.push(app);
+		}
+		return out;
+	});
+
+	// Search: flat list of matching apps across all rendered categories
 	const searchQuery = $derived(search.trim().toLowerCase());
 	const searchResults = $derived.by(() => {
 		if (!searchQuery) return null;
 		const matches = [];
-		for (const cat of visibleCategories) {
+		for (const cat of renderCategories) {
 			for (const app of cat.apps) {
 				if (app.name.toLowerCase().includes(searchQuery)) matches.push(app);
 			}
@@ -124,9 +182,151 @@
 	// Closure-scoped so it survives teardown even if `grid` is nulled first.
 	let cleanupGridListeners = null;
 
+	// ── iOS-style edit state ────────────────────────────────────────
+	// When set, every category card pulses and the next category click
+	// places the picked app there. Cleared by Escape / outside click /
+	// clicking the same tray item again.
+	let pickedApp = $state(null);
+	let pickedAnchor = null; // element we focused from, for Escape restore
+	let dragHoverCatId = $state(null); // highlights drop target during DnD
+	let announcerText = $state(''); // aria-live polite
+
 	function slugify(label) {
 		return label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 	}
+
+	// First-time seed: snapshot the current legacy render into
+	// `prefs.categoryLayout`. Bookmarks deliberately excluded.
+	function ensureLayoutSeeded() {
+		if (categoryLayout) return;
+		const snapshot = visibleCategories
+			.filter(c => c.label !== 'Bookmarks')
+			.map(c => ({
+				id: slugify(c.label),
+				label: c.label,
+				appIds: c.apps.map(a => a.id)
+			}));
+		prefs.update(p => ({ ...p, categoryLayout: snapshot }));
+	}
+
+	function cloneLayout(layout) {
+		return layout.map(c => ({ id: c.id, label: c.label, appIds: [...c.appIds] }));
+	}
+
+	function removeFromCategory(appId) {
+		ensureLayoutSeeded();
+		prefs.update(p => {
+			const next = cloneLayout(p.categoryLayout || []);
+			for (const cat of next) {
+				cat.appIds = cat.appIds.filter(id => id !== appId);
+			}
+			return { ...p, categoryLayout: next };
+		});
+		scheduleTileResize();
+	}
+
+	function pickTrayApp(app, anchor) {
+		if (pickedApp?.id === app.id) {
+			cancelPickup();
+			return;
+		}
+		pickedApp = app;
+		pickedAnchor = anchor || null;
+		announcerText = `Picked up ${app.name}. Select a category to place it.`;
+	}
+
+	function placeIntoCategory(catLabel) {
+		if (!pickedApp) return;
+		if (catLabel === 'Bookmarks') return; // bookmarks are untouchable
+		ensureLayoutSeeded();
+		const id = pickedApp.id;
+		const placedName = pickedApp.name;
+		prefs.update(p => {
+			const next = cloneLayout(p.categoryLayout || []);
+			// Strip from any existing placement (cross-category move).
+			for (const cat of next) {
+				cat.appIds = cat.appIds.filter(x => x !== id);
+			}
+			let bucket = next.find(c => c.label === catLabel);
+			if (!bucket) {
+				bucket = { id: slugify(catLabel), label: catLabel, appIds: [] };
+				next.push(bucket);
+			}
+			bucket.appIds.push(id);
+			return { ...p, categoryLayout: next };
+		});
+		announcerText = `Placed ${placedName} in ${catLabel}.`;
+		pickedApp = null;
+		pickedAnchor = null;
+		scheduleTileResize();
+	}
+
+	function cancelPickup() {
+		if (!pickedApp) return;
+		const anchor = pickedAnchor;
+		pickedApp = null;
+		pickedAnchor = null;
+		announcerText = 'Cancelled.';
+		if (anchor?.focus) requestAnimationFrame(() => anchor.focus());
+	}
+
+	function scheduleTileResize() {
+		requestAnimationFrame(() => {
+			if (!grid) return;
+			for (const el of grid.getGridItems()) grid.resizeToContent(el);
+		});
+	}
+
+	// ── HTML5 drag-and-drop (desktop) ─────────────────────────────
+	// GridStack uses its own pointer-based DnD system for tile moves,
+	// which doesn't collide with HTML5 DnD on the inner fieldset.
+	function onTrayDragStart(e, app) {
+		e.stopPropagation();
+		try {
+			e.dataTransfer.setData('text/hearth-app', app.id);
+			e.dataTransfer.effectAllowed = 'move';
+		} catch { /* some browsers throw on certain data types */ }
+		// Pre-pick so the category pulse activates while dragging.
+		pickedApp = app;
+		pickedAnchor = e.currentTarget;
+	}
+
+	function onCategoryDragOver(e, catId) {
+		if (!e.dataTransfer?.types?.includes('text/hearth-app')) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'move';
+		dragHoverCatId = catId;
+	}
+
+	function onCategoryDrop(e, catLabel) {
+		const id = e.dataTransfer.getData('text/hearth-app');
+		e.preventDefault();
+		dragHoverCatId = null;
+		if (!id) return;
+		// Resolve app from allApps in case pickedApp was cleared somehow.
+		const entry = allApps.get(id);
+		if (!entry) return;
+		pickedApp = entry.app;
+		placeIntoCategory(catLabel);
+	}
+
+	// Global Escape + outside-click cancel while a pickup is active.
+	$effect(() => {
+		if (!browser || !editMode || !pickedApp) return;
+		const onKey = (e) => { if (e.key === 'Escape') cancelPickup(); };
+		const onClick = (e) => {
+			// Ignore clicks on the grid / tray (those handle themselves).
+			if (gridEl?.contains(e.target)) return;
+			if (e.target.closest?.('.app-tray')) return;
+			cancelPickup();
+		};
+		window.addEventListener('keydown', onKey);
+		window.addEventListener('click', onClick, true);
+		return () => {
+			window.removeEventListener('keydown', onKey);
+			window.removeEventListener('click', onClick, true);
+		};
+	});
 
 	// Default width: 1 column per app on desktop, compact on mobile
 	function defaultWidth(appCount, mobile = false) {
@@ -299,6 +499,24 @@
 	}
 
 	function toggleEditMode() {
+		const leaving = editMode;
+		// Cancel any in-flight pickup when leaving edit.
+		if (leaving) pickedApp = null;
+
+		// When leaving edit mode, drop GridStack widgets for categories that
+		// will no longer render (empty after user removed everything). We
+		// pass removeDOM=false and let Svelte do the DOM removal.
+		if (leaving && grid && categoryLayout) {
+			for (const el of [...grid.getGridItems()]) {
+				const gsId = el.getAttribute('gs-id');
+				const entry = categoryLayout.find(c => slugify(c.label) === gsId);
+				if (entry && entry.appIds.length === 0) {
+					grid.removeWidget(el, false);
+				}
+			}
+			saveLayout();
+		}
+
 		editMode = !editMode;
 		if (grid) {
 			// Destroy and re-enable drag with updated handle
@@ -533,11 +751,43 @@
 	</button>
 </div>
 
+<!-- Tray (iOS-style): sticky strip above the grid while editing -->
+{#if editMode}
+	<div class="app-tray" role="toolbar" aria-label="Unplaced apps">
+		<div class="app-tray-scroller">
+			{#if trayApps.length === 0}
+				<div class="app-tray-empty">Everything placed. Click × on an app to move it here.</div>
+			{:else}
+				{#each trayApps as app (app.id)}
+					<button
+						type="button"
+						class="app-tray-item {pickedApp?.id === app.id ? 'app-tray-item-selected' : ''}"
+						aria-label="Move {app.name} to a category"
+						aria-pressed={pickedApp?.id === app.id}
+						draggable="true"
+						ondragstart={(e) => onTrayDragStart(e, app)}
+						onclick={(e) => { e.stopPropagation(); pickTrayApp(app, e.currentTarget); }}
+					>
+						<div class="app-icon-wrap w-10 h-10 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
+							<AppIcon icon={app.icon} name={app.name} size="w-5 h-5" {iconStyle} />
+						</div>
+						<span class="text-[0.6rem] font-medium text-content-muted truncate">{app.name}</span>
+					</button>
+				{/each}
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- aria-live announcer for pickup / place / cancel -->
+<div class="sr-only" aria-live="polite" aria-atomic="true">{announcerText}</div>
+
 <!-- GridStack container -->
-<div bind:this={gridEl} class="grid-stack mb-4 {editMode ? 'grid-edit-mode' : ''}">
-	{#each visibleCategories as category (category.label)}
+<div bind:this={gridEl} class="grid-stack mb-4 {editMode ? 'grid-edit-mode' : ''} {pickedApp ? 'picking' : ''}">
+	{#each renderCategories as category (category.label)}
 		{@const catId = slugify(category.label)}
-		{@const w = defaultWidth(category.apps.length)}
+		{@const w = defaultWidth(Math.max(category.apps.length, 2))}
+		{@const isBookmarks = category.label === 'Bookmarks'}
 		<div class="grid-stack-item"
 			gs-id={catId}
 			gs-w={w}
@@ -547,32 +797,54 @@
 			gs-min-h="1"
 		>
 			<div class="grid-stack-item-content">
-				<fieldset class="category-card rounded-2xl py-4 px-1 {editMode ? 'category-card-edit' : ''} relative">
+				<fieldset
+					class="category-card rounded-2xl py-4 px-1 {editMode ? 'category-card-edit' : ''} {dragHoverCatId === catId ? 'drop-target-hover' : ''} relative"
+					ondragover={editMode && !isBookmarks ? (e) => onCategoryDragOver(e, catId) : undefined}
+					ondragleave={editMode && !isBookmarks ? () => dragHoverCatId = null : undefined}
+					ondrop={editMode && !isBookmarks ? (e) => onCategoryDrop(e, category.label) : undefined}
+				>
 					<legend class="gs-drag-handle text-[0.65rem] text-content-muted tracking-wide px-2">{category.label}</legend>
 					{#if editMode}
-						<div class="edit-overlay"></div>
+						<div
+							class="edit-overlay"
+							role={pickedApp && !isBookmarks ? 'button' : undefined}
+							aria-label={pickedApp && !isBookmarks ? `Place ${pickedApp.name} in ${category.label}` : undefined}
+							onclick={pickedApp && !isBookmarks ? (e) => { e.stopPropagation(); placeIntoCategory(category.label); } : undefined}
+						></div>
 					{/if}
-					<div class="app-grid-inner" style="--cols: {w}">
-						{#each category.apps as app (app.id)}
-							<a
-								href={editMode ? undefined : app.url}
-								target={openInNewTab && !editMode ? '_blank' : undefined}
-								rel={openInNewTab && !editMode ? 'noopener noreferrer' : undefined}
-								class="group relative flex flex-col items-center gap-2 no-underline w-full {editMode ? 'pointer-events-none' : ''}"
-								oncontextmenu={editMode ? undefined : (e) => showContext(app, e)}
-								ontouchstart={editMode ? undefined : (e) => startLongPress(app, e)}
-								ontouchend={editMode ? undefined : cancelLongPress}
-								ontouchmove={editMode ? undefined : cancelLongPress}
-							>
-								<div class="app-icon-wrap w-11 h-11 rounded-[12px] max-md:w-12 max-md:h-12 max-md:rounded-[14px] flex items-center justify-center transition-opacity duration-150 group-hover:opacity-85 relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
-									{#key app.id}
-										<AppIcon icon={app.icon} name={app.name} size="w-6 h-6 max-md:w-7 max-md:h-7" {iconStyle} />
-									{/key}
-								</div>
-								<span class="text-[0.65rem] font-medium text-center transition-colors duration-150 group-hover:text-content leading-tight w-full truncate text-content-muted">{app.name}</span>
-							</a>
-						{/each}
-					</div>
+					{#if editMode && category.apps.length === 0}
+						<div class="app-grid-empty" aria-hidden="true">Drop here</div>
+					{:else}
+						<div class="app-grid-inner" style="--cols: {w}">
+							{#each category.apps as app (app.id)}
+								<a
+									href={editMode ? undefined : app.url}
+									target={openInNewTab && !editMode ? '_blank' : undefined}
+									rel={openInNewTab && !editMode ? 'noopener noreferrer' : undefined}
+									class="group relative flex flex-col items-center gap-2 no-underline w-full {editMode ? 'pointer-events-none' : ''}"
+									oncontextmenu={editMode ? undefined : (e) => showContext(app, e)}
+									ontouchstart={editMode ? undefined : (e) => startLongPress(app, e)}
+									ontouchend={editMode ? undefined : cancelLongPress}
+									ontouchmove={editMode ? undefined : cancelLongPress}
+								>
+									<div class="app-icon-wrap w-11 h-11 rounded-[12px] max-md:w-12 max-md:h-12 max-md:rounded-[14px] flex items-center justify-center transition-opacity duration-150 group-hover:opacity-85 relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
+										{#key app.id}
+											<AppIcon icon={app.icon} name={app.name} size="w-6 h-6 max-md:w-7 max-md:h-7" {iconStyle} />
+										{/key}
+									</div>
+									<span class="text-[0.65rem] font-medium text-center transition-colors duration-150 group-hover:text-content leading-tight w-full truncate text-content-muted">{app.name}</span>
+									{#if editMode && !isBookmarks}
+										<button
+											type="button"
+											class="app-remove-x"
+											aria-label="Remove {app.name} from dashboard"
+											onclick={(e) => { e.preventDefault(); e.stopPropagation(); removeFromCategory(app.id); }}
+										>×</button>
+									{/if}
+								</a>
+							{/each}
+						</div>
+					{/if}
 				</fieldset>
 			</div>
 		</div>
