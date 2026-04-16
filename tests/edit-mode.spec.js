@@ -80,8 +80,8 @@ test.describe('iOS-style edit mode', () => {
 		await tile.click();
 		await expect(page.locator('.grid-stack.picking')).toHaveCount(1);
 
-		// Click any non-bookmark category's drop overlay to place.
-		const firstOverlay = page.locator('.grid-stack-item .drop-overlay').first();
+		// Tap any non-bookmark category to place (uses edit-overlay in tap mode).
+		const firstOverlay = page.locator('.grid-stack-item .edit-overlay').first();
 		await firstOverlay.click();
 		await page.waitForTimeout(200);
 

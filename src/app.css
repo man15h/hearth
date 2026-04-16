@@ -439,15 +439,16 @@ body {
 	outline-offset: 2px;
 }
 
-/* Picking state: pulse the dashed border color + show drop overlay. */
-@media (prefers-reduced-motion: no-preference) {
-	.picking .category-card-edit {
-		animation: dash-pulse 1.5s ease-in-out infinite;
-	}
-	@keyframes dash-pulse {
-		0%, 100% { border-color: var(--text-dim); }
-		50%      { border-color: var(--accent, #6ea8fe); }
-	}
+/* Floating drag clone — follows pointer during tray → category drag. */
+.drag-clone {
+	position: fixed;
+	z-index: 9999;
+	pointer-events: none;
+	opacity: 0.9;
+	transform: scale(1.15);
+	filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+	transition: transform 80ms ease;
+	border-radius: 10px;
 }
 
 /* "Drop here" overlay — shown when a tray app is picked up. */

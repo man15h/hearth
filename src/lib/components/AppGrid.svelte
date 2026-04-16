@@ -294,46 +294,69 @@
 		scheduleTileResize();
 	});
 
-	// ── HTML5 drag-and-drop (desktop) ─────────────────────────────
-	// GridStack uses its own pointer-based DnD system for tile moves,
-	// which doesn't collide with HTML5 DnD on the inner fieldset.
-	function onTrayDragStart(e, app) {
+	// ── Pointer-based drag (smooth iOS-like icon follow) ─────────
+	// pointerdown on tray item → floating clone follows finger/cursor →
+	// hit-test categories on move → "Drop here" overlay on hovered one
+	// only → pointerup to place or cancel. Touch-friendly by default.
+	let dragClone = null;
+	let dragApp = null;
+
+	function onTrayPointerDown(e, app) {
+		if (e.button && e.button !== 0) return; // left / primary only
+		e.preventDefault();
 		e.stopPropagation();
-		try {
-			e.dataTransfer.setData('text/hearth-app', app.id);
-			e.dataTransfer.effectAllowed = 'move';
-		} catch { /* some browsers throw on certain data types */ }
-		// Build a proper drag image from the icon wrap inside the button.
+		e.currentTarget.setPointerCapture(e.pointerId);
+
+		dragApp = app;
+		pickedApp = app;
+		dragHoverCatId = null;
+
+		// Build a floating clone of the icon wrap.
 		const iconEl = e.currentTarget.querySelector('.app-icon-wrap');
 		if (iconEl) {
-			const clone = iconEl.cloneNode(true);
-			clone.style.position = 'absolute';
-			clone.style.top = '-9999px';
-			document.body.appendChild(clone);
-			e.dataTransfer.setDragImage(clone, 20, 20);
-			requestAnimationFrame(() => clone.remove());
+			dragClone = iconEl.cloneNode(true);
+			dragClone.className = 'drag-clone';
+			dragClone.style.left = `${e.clientX - 20}px`;
+			dragClone.style.top = `${e.clientY - 20}px`;
+			document.body.appendChild(dragClone);
 		}
-		pickedApp = app;
-		pickedAnchor = e.currentTarget;
 	}
 
-	function onCategoryDragOver(e, catId) {
-		if (!e.dataTransfer?.types?.includes('text/hearth-app')) return;
-		e.preventDefault();
-		e.dataTransfer.dropEffect = 'move';
-		dragHoverCatId = catId;
+	function onTrayPointerMove(e) {
+		if (!dragClone) return;
+		dragClone.style.left = `${e.clientX - 20}px`;
+		dragClone.style.top = `${e.clientY - 20}px`;
+
+		// Hit-test: which category card is under the pointer?
+		const underEl = document.elementFromPoint(e.clientX, e.clientY);
+		const card = underEl?.closest?.('.category-card');
+		if (card) {
+			const gsItem = card.closest('.grid-stack-item');
+			const catId = gsItem?.getAttribute('gs-id');
+			dragHoverCatId = catId || null;
+		} else {
+			dragHoverCatId = null;
+		}
 	}
 
-	function onCategoryDrop(e, catLabel) {
-		const id = e.dataTransfer.getData('text/hearth-app');
-		e.preventDefault();
+	function onTrayPointerUp(e) {
+		if (!dragApp) return;
+		// Clean up the floating clone.
+		if (dragClone) { dragClone.remove(); dragClone = null; }
+
+		if (dragHoverCatId && gridEl) {
+			// Find the category label for this gs-id.
+			const layout = categoryLayout ?? defaultLayout;
+			const entry = layout.find(c => slugify(c.label) === dragHoverCatId);
+			if (entry && entry.label !== 'Bookmarks') {
+				placeIntoCategory(entry.label);
+			}
+		}
+
 		dragHoverCatId = null;
-		if (!id) return;
-		// Resolve app from allApps in case pickedApp was cleared somehow.
-		const entry = allApps.get(id);
-		if (!entry) return;
-		pickedApp = entry.app;
-		placeIntoCategory(catLabel);
+		dragApp = null;
+		// pickedApp is cleared by placeIntoCategory, or we cancel:
+		if (pickedApp) cancelPickup();
 	}
 
 	// Global Escape + outside-click cancel while a pickup is active.
@@ -341,7 +364,6 @@
 		if (!browser || !editMode || !pickedApp) return;
 		const onKey = (e) => { if (e.key === 'Escape') cancelPickup(); };
 		const onClick = (e) => {
-			// Ignore clicks on the grid / tray (those handle themselves).
 			if (gridEl?.contains(e.target)) return;
 			if (e.target.closest?.('.app-tray')) return;
 			cancelPickup();
@@ -798,8 +820,10 @@
 						aria-label="Move {app.name} to a category"
 						title={app.name}
 						aria-pressed={pickedApp?.id === app.id}
-						draggable="true"
-						ondragstart={(e) => onTrayDragStart(e, app)}
+						onpointerdown={(e) => onTrayPointerDown(e, app)}
+						onpointermove={onTrayPointerMove}
+						onpointerup={onTrayPointerUp}
+						onpointercancel={onTrayPointerUp}
 						onclick={(e) => { e.stopPropagation(); pickTrayApp(app, e.currentTarget); }}
 					>
 						<div class="app-icon-wrap w-10 h-10 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
@@ -832,13 +856,10 @@
 			<div class="grid-stack-item-content">
 				<fieldset
 					class="category-card rounded-2xl py-4 px-1 {editMode ? 'category-card-edit' : ''} {dragHoverCatId === catId ? 'drop-target-hover' : ''} relative"
-					ondragover={editMode && !isBookmarks ? (e) => onCategoryDragOver(e, catId) : undefined}
-					ondragleave={editMode && !isBookmarks ? () => dragHoverCatId = null : undefined}
-					ondrop={editMode && !isBookmarks ? (e) => onCategoryDrop(e, category.label) : undefined}
 				>
 					<legend class="gs-drag-handle text-[0.65rem] text-content-muted tracking-wide px-2">{category.label}</legend>
 					{#if editMode}
-						{#if pickedApp && !isBookmarks}
+						{#if dragHoverCatId === catId && pickedApp && !isBookmarks}
 							<div
 								class="drop-overlay"
 								role="button"
@@ -850,6 +871,13 @@
 								</div>
 								<span class="drop-overlay-text">Drop here</span>
 							</div>
+						{:else if pickedApp && !isBookmarks}
+							<div
+								class="edit-overlay"
+								role="button"
+								aria-label="Place {pickedApp.name} in {category.label}"
+								onclick={(e) => { e.stopPropagation(); placeIntoCategory(category.label); }}
+							></div>
 						{:else}
 							<div class="edit-overlay"></div>
 						{/if}
