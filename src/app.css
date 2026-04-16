@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "gridstack/dist/gridstack.min.css";
 
 @theme {
 	--font-mono: var(--font-family, 'JetBrains Mono'), monospace;
@@ -254,7 +255,7 @@ body {
 	--color-content: #a1a1aa;
 	--color-content-muted: #71717a;
 	--color-content-dim: #52525b;
-	--icon-filter-grayed: brightness(0) invert(1) opacity(0.7);
+	--icon-filter-grayed: brightness(0) invert(1) opacity(0.55);
 }
 
 .theme-light .grayed-widgets {
@@ -264,7 +265,7 @@ body {
 	--color-content: #3f3f46;
 	--color-content-muted: #52525b;
 	--color-content-dim: #71717a;
-	--icon-filter-grayed: brightness(0) opacity(0.7);
+	--icon-filter-grayed: brightness(0) opacity(0.55);
 }
 
 /* Icon filter utilities — theme-aware via CSS variables */
@@ -281,8 +282,8 @@ body {
    white tile backgrounds glow against atmospheric wallpapers. This tones
    down the entire tile (bg + icon) so it integrates with the scene. */
 .wallpaper-active .app-icon-wrap {
-	opacity: 0.75;
-	filter: saturate(0.7);
+	opacity: 0.82;
+	filter: saturate(0.8);
 }
 
 /* Brand icon filters — theme-independent, always literal white/black */
@@ -290,8 +291,8 @@ body {
 .brand-icon-black { filter: brightness(0); }
 
 /* Grayscale fallback — when mono icon fails and falls back to colored */
-.icon-grayscale-fallback { filter: grayscale(1) brightness(2) contrast(1.2) !important; }
-.theme-light .icon-grayscale-fallback { filter: grayscale(1) brightness(0.3) contrast(1.2) !important; }
+.icon-grayscale-fallback { filter: grayscale(1) brightness(1.6) contrast(1.1) !important; }
+.theme-light .icon-grayscale-fallback { filter: grayscale(1) brightness(0.4) contrast(1.1) !important; }
 
 /* Light mode color-scheme hint */
 .theme-light { color-scheme: light; }
@@ -325,3 +326,75 @@ body {
 }
 .animate-toast-in { animation: toast-in 0.3s ease-out both; }
 .animate-toast-out { animation: toast-out 0.2s ease-in both; }
+
+/* ── GridStack overrides ─────────────────────────── */
+.grid-stack {
+	min-height: 0 !important;
+}
+
+.grid-stack-placeholder > .placeholder-content {
+	background: var(--card-bg) !important;
+	border: 1px dashed var(--card-border) !important;
+	border-radius: 1rem;
+}
+
+.grid-stack-item-content {
+	background: transparent !important;
+}
+
+/* Inner app grid — 1 column per app slot, aligned to GridStack columns */
+.app-grid-inner {
+	display: grid;
+	grid-template-columns: repeat(var(--cols, 4), 1fr);
+	gap: 1.25rem 0;
+}
+
+/* Drag handle */
+.gs-drag-handle { cursor: default; user-select: none; }
+.grid-edit-mode .gs-drag-handle { cursor: grab; }
+.grid-edit-mode .gs-drag-handle:active { cursor: grabbing; }
+
+/* Edit mode: dashed border + drag overlay on category cards */
+.category-card-edit {
+	border: 1px dashed var(--text-dim) !important;
+	cursor: grab;
+}
+.category-card-edit:active {
+	cursor: grabbing;
+}
+
+/* Edit overlay — blocks clicks on apps, allows drag from anywhere */
+.edit-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	border-radius: inherit;
+	cursor: grab;
+}
+.edit-overlay:active {
+	cursor: grabbing;
+}
+
+/* Resize handles — completely hidden by default */
+.grid-stack-item > .ui-resizable-handle {
+	display: none !important;
+}
+/* Show SE handle in edit mode */
+.grid-edit-mode .grid-stack-item > .ui-resizable-se {
+	display: block !important;
+	width: 20px !important;
+	height: 20px !important;
+	background-image: none !important;
+	background: none !important;
+	bottom: 0 !important;
+	right: 0 !important;
+	transform: none !important;
+}
+.grid-edit-mode .grid-stack-item > .ui-resizable-se::after {
+	content: '';
+	position: absolute;
+	bottom: 4px; right: 4px;
+	width: 8px; height: 8px;
+	border-right: 2px solid var(--text-muted);
+	border-bottom: 2px solid var(--text-muted);
+}
