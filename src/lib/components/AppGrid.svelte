@@ -63,39 +63,8 @@
 
 	let mounted = $state(false);
 
-	// Legacy render path — used when `prefs.categoryLayout` is not set.
-	// Once the user enters edit mode for the first time we seed
-	// `categoryLayout` from this and the new layout-driven path takes over.
-	const visibleCategories = $derived.by(() => {
-		const filtered = categories
-			.map(cat => ({
-				...cat,
-				apps: cat.apps.filter(app => {
-					if (app.adminOnly && !isAdmin) return false;
-					if (!mounted) return app.default !== false;
-					return visibleAppIds.includes(app.id);
-				})
-			}))
-			.filter(cat => cat.apps.length > 0);
-
-		// Merge admin-added apps
-		for (const ac of adminCategories) {
-			const visibleApps = ac.apps.filter(a => visibleAppIds.includes(a.id));
-			if (!visibleApps.length) continue;
-			const existing = filtered.find(c => c.label === ac.label);
-			if (existing) existing.apps.push(...visibleApps);
-			else filtered.push({ label: ac.label, apps: visibleApps });
-		}
-
-		if (bookmarksCategory) filtered.push(bookmarksCategory);
-		return filtered;
-	});
-
-	// ── Layout-driven render (iOS-style edit mode) ───────────────────
 	// Union of all apps the user *could* place (built-in + admin-added,
 	// bookmarks excluded — they keep their own untouchable category).
-	// Carries each app's *default* category so new-from-config apps
-	// have a home to return to if we ever do full orphan reconciliation.
 	const allApps = $derived.by(() => {
 		const m = new Map();
 		for (const cat of categories) {
@@ -112,20 +81,55 @@
 		return m;
 	});
 
-	// null ⇒ legacy path; array ⇒ authoritative layout.
+	// Default placement snapshot: apps with default_visible !== false,
+	// grouped by their config category. Used to seed `categoryLayout`
+	// on first render, and as a reset baseline.
+	const defaultLayout = $derived.by(() => {
+		const byCat = new Map();
+		for (const cat of categories) {
+			for (const app of cat.apps) {
+				if (app.adminOnly && !isAdmin) continue;
+				if (app.default === false) continue;
+				if (!byCat.has(cat.label)) byCat.set(cat.label, []);
+				byCat.get(cat.label).push(app.id);
+			}
+		}
+		for (const ac of adminCategories) {
+			for (const app of ac.apps) {
+				if (!byCat.has(ac.label)) byCat.set(ac.label, []);
+				byCat.get(ac.label).push(app.id);
+			}
+		}
+		return Array.from(byCat, ([label, appIds]) => ({
+			id: slugify(label), label, appIds
+		}));
+	});
+
+	// Authoritative layout. `null` only until the first-mount seed effect
+	// runs; after that it's always an array.
 	const categoryLayout = $derived(
 		Array.isArray($prefs.categoryLayout) ? $prefs.categoryLayout : null
 	);
 
+	// First-mount seed: write defaultLayout into prefs if the user has
+	// none. Hidden-by-default apps skip placement and land in the tray.
+	$effect(() => {
+		if (!browser || !mounted) return;
+		if (categoryLayout) return;
+		prefs.update(p => ({ ...p, categoryLayout: defaultLayout }));
+	});
+
 	const renderCategories = $derived.by(() => {
-		if (!categoryLayout) return visibleCategories;
+		// Until the seed effect fires on first render we fall back to
+		// defaultLayout so SSR → hydration has something sensible.
+		const layout = categoryLayout ?? defaultLayout;
 		const result = [];
-		for (const entry of categoryLayout) {
+		for (const entry of layout) {
 			const apps = entry.appIds
 				.map(id => allApps.get(id)?.app)
 				.filter(Boolean);
-			// Keep empty categories around in edit mode so the user can
-			// drop into them; hide them otherwise.
+			// Keep empty categories visible in edit mode so they're
+			// droppable; hide them otherwise.
 			if (!apps.length && !editMode) continue;
 			result.push({ label: entry.label, apps });
 		}
@@ -133,12 +137,10 @@
 		return result;
 	});
 
-	// Apps not placed anywhere. Empty in legacy mode (no tray then).
-	// New apps added to config land here on first render after a layout
-	// has been seeded — the user decides where to put them.
+	// Apps in `allApps` but not placed anywhere go to the tray.
 	const trayApps = $derived.by(() => {
-		if (!categoryLayout) return [];
-		const placed = new Set(categoryLayout.flatMap(c => c.appIds || []));
+		const layout = categoryLayout ?? defaultLayout;
+		const placed = new Set(layout.flatMap(c => c.appIds || []));
 		const out = [];
 		for (const [id, { app }] of allApps) {
 			if (!placed.has(id)) out.push(app);
@@ -195,34 +197,18 @@
 		return label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 	}
 
-	// First-time seed: snapshot the current legacy render into
-	// `prefs.categoryLayout`. Bookmarks deliberately excluded.
-	function ensureLayoutSeeded() {
-		if (categoryLayout) return;
-		const snapshot = visibleCategories
-			.filter(c => c.label !== 'Bookmarks')
-			.map(c => ({
-				id: slugify(c.label),
-				label: c.label,
-				appIds: c.apps.map(a => a.id)
-			}));
-		prefs.update(p => ({ ...p, categoryLayout: snapshot }));
-	}
-
 	function cloneLayout(layout) {
 		return layout.map(c => ({ id: c.id, label: c.label, appIds: [...c.appIds] }));
 	}
 
 	function removeFromCategory(appId) {
-		ensureLayoutSeeded();
 		prefs.update(p => {
-			const next = cloneLayout(p.categoryLayout || []);
+			const next = cloneLayout(p.categoryLayout || defaultLayout);
 			for (const cat of next) {
 				cat.appIds = cat.appIds.filter(id => id !== appId);
 			}
 			return { ...p, categoryLayout: next };
 		});
-		scheduleTileResize();
 	}
 
 	function pickTrayApp(app, anchor) {
@@ -238,11 +224,10 @@
 	function placeIntoCategory(catLabel) {
 		if (!pickedApp) return;
 		if (catLabel === 'Bookmarks') return; // bookmarks are untouchable
-		ensureLayoutSeeded();
 		const id = pickedApp.id;
 		const placedName = pickedApp.name;
 		prefs.update(p => {
-			const next = cloneLayout(p.categoryLayout || []);
+			const next = cloneLayout(p.categoryLayout || defaultLayout);
 			// Strip from any existing placement (cross-category move).
 			for (const cat of next) {
 				cat.appIds = cat.appIds.filter(x => x !== id);
@@ -258,7 +243,6 @@
 		announcerText = `Placed ${placedName} in ${catLabel}.`;
 		pickedApp = null;
 		pickedAnchor = null;
-		scheduleTileResize();
 	}
 
 	function cancelPickup() {
@@ -270,12 +254,25 @@
 		if (anchor?.focus) requestAnimationFrame(() => anchor.focus());
 	}
 
+	// Resize every tile to its new content height. Double-rAF so the
+	// callback runs *after* Svelte has flushed the {#each} DOM update
+	// for the category we just mutated — a single rAF measures stale DOM.
 	function scheduleTileResize() {
-		requestAnimationFrame(() => {
+		if (!grid) return;
+		requestAnimationFrame(() => requestAnimationFrame(() => {
 			if (!grid) return;
 			for (const el of grid.getGridItems()) grid.resizeToContent(el);
-		});
+		}));
 	}
+
+	// Auto-resize on every layout mutation (add, remove, cross-move).
+	// Keyed off `categoryLayout` so any appIds change → re-measure.
+	$effect(() => {
+		// touch the dep so svelte re-runs on change
+		void categoryLayout;
+		if (!mounted || !grid) return;
+		scheduleTileResize();
+	});
 
 	// ── HTML5 drag-and-drop (desktop) ─────────────────────────────
 	// GridStack uses its own pointer-based DnD system for tile moves,
