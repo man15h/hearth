@@ -105,8 +105,10 @@ test.describe('GridStack breakpoint behavior', () => {
 		const widths = await getItemWidths(page);
 		const tools = widths.find(w => w.id === 'tools');
 		const storage = widths.find(w => w.id === 'storage');
-		if (tools) expect(tools.w).toBe(6);
-		if (storage) expect(storage.w).toBe(6);
+		expect(tools, 'tools tile must exist').toBeDefined();
+		expect(storage, 'storage tile must exist').toBeDefined();
+		expect(tools.w).toBe(6);
+		expect(storage.w).toBe(6);
 	});
 
 	test('crossing breakpoint re-applies saved layout for new column count', async ({ page }) => {
@@ -128,7 +130,8 @@ test.describe('GridStack breakpoint behavior', () => {
 
 		let widths = await getItemWidths(page);
 		let tools = widths.find(w => w.id === 'tools');
-		if (tools) expect(tools.w, 'desktop w=8').toBe(8);
+		expect(tools, 'tools tile must exist on desktop').toBeDefined();
+		expect(tools.w, 'desktop w=8').toBe(8);
 
 		// Shrink to mobile — crosses two breakpoints
 		await page.setViewportSize({ width: 500, height: 900 });
@@ -137,9 +140,8 @@ test.describe('GridStack breakpoint behavior', () => {
 
 		widths = await getItemWidths(page);
 		tools = widths.find(w => w.id === 'tools');
-		if (tools) {
-			expect(tools.w, 'mobile w should flip to 4').toBe(4);
-			expect(tools.innerCols, '--cols should follow').toBe('4');
-		}
+		expect(tools, 'tools tile must still exist on mobile').toBeDefined();
+		expect(tools.w, 'mobile w should flip to 4').toBe(4);
+		expect(tools.innerCols, '--cols should follow').toBe('4');
 	});
 });
