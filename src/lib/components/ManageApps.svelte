@@ -230,8 +230,14 @@
 			class="glass-card rounded-2xl w-full max-w-[620px] h-[520px] max-md:max-w-full max-md:h-[75vh] max-md:rounded-xl overflow-hidden animate-modal-enter shadow-theme relative flex flex-col"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<!-- Mobile: horizontal tabs + close -->
-			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 gap-1 border-b border-border-card overflow-x-auto items-center">
+			<button
+				class="absolute top-4 right-5 bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content z-10"
+				onclick={() => open = false}
+				aria-label="Close"
+			>&times;</button>
+
+			<!-- Mobile: horizontal tabs -->
+			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 pr-10 gap-1 border-b border-border-card overflow-x-auto items-center">
 				{#each [
 					{ id: 'appearance', label: 'Appearance' },
 					{ id: 'apps', label: 'Apps' },
@@ -243,24 +249,12 @@
 						onclick={() => activeTab = tab.id}
 					>{tab.label}</button>
 				{/each}
-				<button
-					class="bg-transparent border-none text-content-dim cursor-pointer hover:text-content px-2 py-2 shrink-0"
-					onclick={() => open = false}
-				>
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-				</button>
 			</div>
 
 			<!-- Tabbed layout: sidebar (desktop) + content -->
 			<div class="flex flex-1 min-h-0">
 				<!-- Sidebar — hidden on mobile -->
-				<div class="w-[160px] shrink-0 px-2.5 pt-3 pb-3 flex flex-col max-md:hidden">
-					<button
-						class="bg-transparent border-none text-content-dim cursor-pointer hover:text-content self-end mr-1 mb-2"
-						onclick={() => open = false}
-					>
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-					</button>
+				<div class="w-[160px] shrink-0 px-2.5 pt-10 pb-3 flex flex-col max-md:hidden">
 					<div class="flex flex-col gap-0.5">
 						{#each [
 							{ id: 'appearance', label: 'Appearance', svg: '<circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v-2M4.22 4.22l1.42 1.42m12.72 12.72-1.42-1.42M1 12h2m18 0h-2M4.22 19.78l1.42-1.42M18.36 5.64l-1.42 1.42"/>' },
@@ -521,7 +515,8 @@
 					</div>
 				{/if}
 
-				<!-- Custom Bookmarks (per-user) -->
+				<!-- Custom Bookmarks (per-user) — hidden for now -->
+				{#if false}
 				<div class="mt-5">
 					<div class="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">Your Bookmarks</div>
 
@@ -568,6 +563,7 @@
 						</button>
 					{/if}
 				</div>
+				{/if}
 
 				{:else if activeTab === 'widgets'}
 				<!-- ═══ WIDGETS TAB ═══ -->
