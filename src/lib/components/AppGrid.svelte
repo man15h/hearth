@@ -1,17 +1,19 @@
 <script>
-	import { onMount, getContext } from 'svelte';
+	import { onMount, getContext, untrack } from 'svelte';
 	import { prefs } from '$lib/stores/prefs.js';
 	import { adminApps as adminAppsStore } from '$lib/stores/adminApps.js';
 	import { buildAppsFromConfig, resolveIcon } from '$lib/apps.js';
 	import { getIconSrc, getIconClass, handleIconError, getBrandBgStyle, getBrandIconClass } from '$lib/iconHelpers.js';
 	import AppIcon from '$lib/components/AppIcon.svelte';
+	import SearchBar from '$lib/components/SearchBar.svelte';
 
 	import { browser } from '$app/environment';
 
 	const siteConfig = getContext('config');
 	const { categories, defaultAppIds, setupGuides } = buildAppsFromConfig(siteConfig?.apps);
 
-	let { isAdmin = false, guideApp = $bindable(null), search = '' } = $props();
+	let { isAdmin = false, guideApp = $bindable(null), editMode = $bindable(false), searchEnabled = false } = $props();
+	let searchInput = $state('');
 	let platform = $state('desktop');
 
 	// Lock body scroll when setup guide modal is open
@@ -63,37 +65,110 @@
 
 	let mounted = $state(false);
 
-	const visibleCategories = $derived.by(() => {
-		const filtered = categories
-			.map(cat => ({
-				...cat,
-				apps: cat.apps.filter(app => {
-					if (app.adminOnly && !isAdmin) return false;
-					if (!mounted) return app.default !== false;
-					return visibleAppIds.includes(app.id);
-				})
-			}))
-			.filter(cat => cat.apps.length > 0);
-
-		// Merge admin-added apps
-		for (const ac of adminCategories) {
-			const visibleApps = ac.apps.filter(a => visibleAppIds.includes(a.id));
-			if (!visibleApps.length) continue;
-			const existing = filtered.find(c => c.label === ac.label);
-			if (existing) existing.apps.push(...visibleApps);
-			else filtered.push({ label: ac.label, apps: visibleApps });
+	// Union of all apps the user *could* place (built-in + admin-added,
+	// bookmarks excluded — they keep their own untouchable category).
+	const allApps = $derived.by(() => {
+		const m = new Map();
+		for (const cat of categories) {
+			for (const app of cat.apps) {
+				if (app.adminOnly && !isAdmin) continue;
+				m.set(app.id, { app, defaultCategory: cat.label });
+			}
 		}
-
-		if (bookmarksCategory) filtered.push(bookmarksCategory);
-		return filtered;
+		for (const ac of adminCategories) {
+			for (const app of ac.apps) {
+				m.set(app.id, { app, defaultCategory: ac.label });
+			}
+		}
+		return m;
 	});
 
-	// Search: flat list of matching apps across all categories
-	const searchQuery = $derived(search.trim().toLowerCase());
+	// Default placement snapshot: apps with default_visible !== false,
+	// grouped by their config category. Used to seed `categoryLayout`
+	// on first render, and as a reset baseline.
+	const defaultLayout = $derived.by(() => {
+		const byCat = new Map();
+		for (const cat of categories) {
+			for (const app of cat.apps) {
+				if (app.adminOnly && !isAdmin) continue;
+				if (app.default === false) continue;
+				if (!byCat.has(cat.label)) byCat.set(cat.label, []);
+				byCat.get(cat.label).push(app.id);
+			}
+		}
+		for (const ac of adminCategories) {
+			for (const app of ac.apps) {
+				if (!byCat.has(ac.label)) byCat.set(ac.label, []);
+				byCat.get(ac.label).push(app.id);
+			}
+		}
+		return Array.from(byCat, ([label, appIds]) => ({
+			id: slugify(label), label, appIds
+		}));
+	});
+
+	// Authoritative layout. `null` only until the first-mount seed effect
+	// runs; after that it's always an array.
+	const categoryLayout = $derived(
+		Array.isArray($prefs.categoryLayout) ? $prefs.categoryLayout : null
+	);
+
+	// First-mount seed: write defaultLayout into prefs if the user has
+	// none. Hidden-by-default apps skip placement and land in the tray.
+	$effect(() => {
+		if (!browser || !mounted) return;
+		if (categoryLayout) return;
+		prefs.update(p => ({ ...p, categoryLayout: defaultLayout }));
+	});
+
+	// Lazily seed `categoryCols` for any rendered category that doesn't
+	// have an entry yet. Intentionally does NOT overwrite existing
+	// entries so app add/remove can't shrink an existing width.
+	$effect(() => {
+		for (const cat of renderCategories) {
+			const catId = slugify(cat.label);
+			if (categoryCols[catId] == null) {
+				categoryCols[catId] = defaultWidth(Math.max(cat.apps.length, 2));
+			}
+		}
+	});
+
+	const renderCategories = $derived.by(() => {
+		// Until the seed effect fires on first render we fall back to
+		// defaultLayout so SSR → hydration has something sensible.
+		const layout = categoryLayout ?? defaultLayout;
+		const result = [];
+		for (const entry of layout) {
+			const apps = entry.appIds
+				.map(id => allApps.get(id)?.app)
+				.filter(Boolean);
+			// Keep empty categories visible in edit mode so they're
+			// droppable; hide them otherwise.
+			if (!apps.length && !editMode) continue;
+			result.push({ label: entry.label, apps });
+		}
+		if (bookmarksCategory) result.push(bookmarksCategory);
+		return result;
+	});
+
+	// Apps in `allApps` but not placed anywhere go to the tray.
+	const trayApps = $derived.by(() => {
+		const layout = categoryLayout ?? defaultLayout;
+		const placed = new Set(layout.flatMap(c => c.appIds || []));
+		const out = [];
+		for (const [id, { app }] of allApps) {
+			if (!placed.has(id)) out.push(app);
+		}
+		return out;
+	});
+
+	// Search: flat list of matching apps across all rendered categories
+	const searchQuery = $derived(searchInput.trim().toLowerCase());
+	const allAppsArr = $derived(Array.from(allApps.values()).map(v => v.app));
 	const searchResults = $derived.by(() => {
 		if (!searchQuery) return null;
 		const matches = [];
-		for (const cat of visibleCategories) {
+		for (const cat of renderCategories) {
 			for (const app of cat.apps) {
 				if (app.name.toLowerCase().includes(searchQuery)) matches.push(app);
 			}
@@ -119,14 +194,327 @@
 	// ── GridStack ──
 	let gridEl = $state(null);
 	let grid = null;
-	let editMode = $state(false);
 	// Cleanup for GridStack-attached listeners (window resize, debounce timer).
 	// Closure-scoped so it survives teardown even if `grid` is nulled first.
 	let cleanupGridListeners = null;
 
+	// Per-category column count (--cols). Seeded lazily via the
+	// $effect below (never from within render, which would loop).
+	// Updated only when the user resizes a tile or when
+	// `applyLayoutForColumn` restores a saved width. Decoupled from
+	// `apps.length` so dropping a new app into a full tile wraps to
+	// a new row instead of squishing icons.
+	let categoryCols = $state({});
+
+	// ── Tray scroll ──────────────────────────────────────────────
+	let trayScrollerEl = $state(null);
+	let trayScrollPos = $state(0);
+	let trayScrollMax = $state(0);
+
+	function onTrayScroll() {
+		if (!trayScrollerEl) return;
+		trayScrollPos = Math.round(trayScrollerEl.scrollLeft);
+		trayScrollMax = trayScrollerEl.scrollWidth - trayScrollerEl.clientWidth;
+	}
+
+	function scrollTray(direction) {
+		if (!trayScrollerEl) return;
+		const page = trayScrollerEl.clientWidth * 0.8;
+		trayScrollerEl.scrollBy({ left: direction * page, behavior: 'smooth' });
+	}
+
+	$effect(() => {
+		void trayApps;
+		if (!trayScrollerEl) return;
+		requestAnimationFrame(() => {
+			trayScrollPos = Math.round(trayScrollerEl.scrollLeft);
+			trayScrollMax = trayScrollerEl.scrollWidth - trayScrollerEl.clientWidth;
+		});
+	});
+
+	// ── iOS-style edit state ────────────────────────────────────────
+	// When set, every category card pulses and the next category click
+	// places the picked app there. Cleared by Escape / outside click /
+	// clicking the same tray item again.
+	let pickedApp = $state(null);
+	let pickedAnchor = null; // element we focused from, for Escape restore
+	let dragHoverCatId = $state(null); // highlights drop target during DnD
+	let announcerText = $state(''); // aria-live polite
+
 	function slugify(label) {
 		return label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 	}
+
+	function cloneLayout(layout) {
+		return layout.map(c => ({ id: c.id, label: c.label, appIds: [...c.appIds] }));
+	}
+
+	function removeFromCategory(appId) {
+		prefs.update(p => {
+			const next = cloneLayout(p.categoryLayout || defaultLayout);
+			for (const cat of next) {
+				cat.appIds = cat.appIds.filter(id => id !== appId);
+			}
+			return { ...p, categoryLayout: next };
+		});
+	}
+
+	function pickTrayApp(app, anchor) {
+		if (pickedApp?.id === app.id) {
+			cancelPickup();
+			return;
+		}
+		pickedApp = app;
+		pickedAnchor = anchor || null;
+		announcerText = `Picked up ${app.name}. Select a category to place it.`;
+	}
+
+	function placeIntoCategory(catLabel) {
+		if (!pickedApp) return;
+		if (catLabel === 'Bookmarks') return; // bookmarks are untouchable
+		const id = pickedApp.id;
+		const placedName = pickedApp.name;
+		prefs.update(p => {
+			const next = cloneLayout(p.categoryLayout || defaultLayout);
+			// Strip from any existing placement (cross-category move).
+			for (const cat of next) {
+				cat.appIds = cat.appIds.filter(x => x !== id);
+			}
+			let bucket = next.find(c => c.label === catLabel);
+			if (!bucket) {
+				bucket = { id: slugify(catLabel), label: catLabel, appIds: [] };
+				next.push(bucket);
+			}
+			bucket.appIds.push(id);
+			return { ...p, categoryLayout: next };
+		});
+		announcerText = `Placed ${placedName} in ${catLabel}.`;
+		pickedApp = null;
+		pickedAnchor = null;
+	}
+
+	function cancelPickup() {
+		// Cancel any long-press timer and in-flight floating clone too,
+		// so Escape / editMode-exit / unmount leave no stuck state.
+		if (pendingDrag) {
+			clearTimeout(pendingDrag.holdTimer);
+			pendingDrag = null;
+		}
+		if (dragClone) { dragClone.remove(); dragClone = null; }
+		dragApp = null;
+		dragSourceLabel = null;
+		dragHoverTray = false;
+		dragHoverCatId = null;
+		detachDragListeners();
+		if (!pickedApp) return;
+		const anchor = pickedAnchor;
+		pickedApp = null;
+		pickedAnchor = null;
+		announcerText = 'Cancelled.';
+		if (anchor?.focus) requestAnimationFrame(() => anchor.focus());
+	}
+
+	// Resize only the tiles whose appIds changed between layouts. Double-rAF
+	// so the callback runs *after* Svelte has flushed the {#each} DOM update
+	// for the category we just mutated — a single rAF measures stale DOM.
+	function scheduleTileResize(changedIds) {
+		if (!grid) return;
+		requestAnimationFrame(() => requestAnimationFrame(() => {
+			if (!grid) return;
+			for (const el of grid.getGridItems()) {
+				const gsId = el.getAttribute('gs-id');
+				if (!changedIds || changedIds.has(gsId)) grid.resizeToContent(el);
+			}
+		}));
+	}
+
+	// Auto-resize on layout mutation. On the first run (prev=null) we resize
+	// every tile; on subsequent runs we diff previous vs. current layout and
+	// only resize the categories whose appIds actually changed.
+	let prevCatLayout = null;
+	$effect(() => {
+		const cur = categoryLayout;
+		untrack(() => {
+			if (!mounted || !grid) return;
+			const prev = prevCatLayout;
+			prevCatLayout = cur;
+			if (!prev) { scheduleTileResize(null); return; }
+			const changed = new Set();
+			for (const c of cur || []) {
+				const p = prev.find(x => x.label === c.label);
+				if (!p || p.appIds.length !== c.appIds.length ||
+					!p.appIds.every((id, i) => id === c.appIds[i])) changed.add(slugify(c.label));
+			}
+			for (const p of prev) {
+				if (!(cur || []).find(c => c.label === p.label)) changed.add(slugify(p.label));
+			}
+			if (changed.size) scheduleTileResize(changed);
+		});
+	});
+
+	// ── Pointer-based drag (smooth iOS-like icon follow) ─────────
+	// pointerdown on any app (tray or placed) → floating clone follows
+	// finger/cursor → hit-test categories + tray on move → pointerup
+	// resolves placement (cross-category move, send-to-tray, or cancel).
+	// Tray items use a long-press gate so short horizontal swipes scroll
+	// the strip instead of accidentally starting a drag.
+	let dragClone = null;
+	let dragApp = null;
+	let dragSourceLabel = null; // category label where drag started; null if from tray
+	let dragHoverTray = $state(false);
+	let pendingDrag = null; // { app, sourceLabel, target, pointerId, startX, startY, holdTimer }
+	let dragListenersAttached = false;
+	const LONG_PRESS_MS = 280;
+	const MOVE_CANCEL_PX = 8;
+	const CLONE_OFFSET = 20;
+
+	function attachDragListeners() {
+		if (dragListenersAttached) return;
+		window.addEventListener('pointermove', onAppPointerMove);
+		window.addEventListener('pointerup', onAppPointerUp);
+		window.addEventListener('pointercancel', onAppPointerUp);
+		dragListenersAttached = true;
+	}
+
+	function detachDragListeners() {
+		if (!dragListenersAttached) return;
+		window.removeEventListener('pointermove', onAppPointerMove);
+		window.removeEventListener('pointerup', onAppPointerUp);
+		window.removeEventListener('pointercancel', onAppPointerUp);
+		dragListenersAttached = false;
+	}
+
+	function beginDrag(app, sourceLabel, target, pointerId, x, y) {
+		if (dragApp) return; // another drag already in-flight — don't overwrite state
+		try { target.setPointerCapture(pointerId); } catch {}
+		dragApp = app;
+		dragSourceLabel = sourceLabel ?? null;
+		pickedApp = app;
+		dragHoverCatId = null;
+		dragHoverTray = false;
+		const iconEl = target.querySelector('.app-icon-wrap');
+		if (iconEl) {
+			dragClone = iconEl.cloneNode(true);
+			dragClone.classList.add('drag-clone');
+			dragClone.style.left = `${x - CLONE_OFFSET}px`;
+			dragClone.style.top = `${y - CLONE_OFFSET}px`;
+			document.body.appendChild(dragClone);
+		}
+	}
+
+	function onAppPointerDown(e, app, sourceLabel) {
+		if (e.button && e.button !== 0) return; // left / primary only
+		e.stopPropagation();
+
+		// Listeners live on window for the duration of the gesture, so
+		// the drag survives re-renders that would otherwise strip per-element
+		// handlers (editMode flip, category reshuffle, etc.).
+		attachDragListeners();
+
+		// Category apps: drag begins immediately (no scroll to preserve).
+		if (sourceLabel !== null) {
+			e.preventDefault();
+			beginDrag(app, sourceLabel, e.currentTarget, e.pointerId, e.clientX, e.clientY);
+			return;
+		}
+
+		// Tray apps: wait for a long-press so horizontal swipes can still
+		// scroll the strip. Cancel if the user moves past MOVE_CANCEL_PX
+		// before the timer fires.
+		const target = e.currentTarget;
+		const pointerId = e.pointerId;
+		pendingDrag = {
+			app, sourceLabel, target, pointerId,
+			startX: e.clientX, startY: e.clientY,
+			holdTimer: setTimeout(() => {
+				if (!pendingDrag) return;
+				const p = pendingDrag; pendingDrag = null;
+				beginDrag(p.app, p.sourceLabel, p.target, p.pointerId, p.startX, p.startY);
+			}, LONG_PRESS_MS)
+		};
+	}
+
+	function cancelPending() {
+		if (!pendingDrag) return;
+		clearTimeout(pendingDrag.holdTimer);
+		pendingDrag = null;
+		if (!dragApp) detachDragListeners();
+	}
+
+	function onAppPointerMove(e) {
+		if (pendingDrag) {
+			const dx = Math.abs(e.clientX - pendingDrag.startX);
+			const dy = Math.abs(e.clientY - pendingDrag.startY);
+			if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) cancelPending();
+			return;
+		}
+		if (!dragClone) return;
+		dragClone.style.left = `${e.clientX - 20}px`;
+		dragClone.style.top = `${e.clientY - 20}px`;
+
+		// Hit-test: tray first (to allow sending a placed app back), then categories.
+		const underEl = document.elementFromPoint(e.clientX, e.clientY);
+		if (underEl?.closest?.('.app-tray')) {
+			dragHoverTray = !!dragSourceLabel; // only meaningful when the drag came from a category
+			dragHoverCatId = null;
+			return;
+		}
+		dragHoverTray = false;
+		const card = underEl?.closest?.('.category-card');
+		if (card) {
+			const gsItem = card.closest('.grid-stack-item');
+			const catId = gsItem?.getAttribute('gs-id');
+			dragHoverCatId = catId || null;
+		} else {
+			dragHoverCatId = null;
+		}
+	}
+
+	function onAppPointerUp(e) {
+		if (pendingDrag) { cancelPending(); return; }
+		if (!dragApp) { detachDragListeners(); return; }
+		// Clean up the floating clone.
+		if (dragClone) { dragClone.remove(); dragClone = null; }
+
+		if (dragHoverTray && dragSourceLabel) {
+			// Send a placed app back to the tray.
+			removeFromCategory(dragApp.id);
+			announcerText = `Moved ${dragApp.name} to the tray.`;
+			pickedApp = null;
+			pickedAnchor = null;
+		} else if (dragHoverCatId && gridEl) {
+			const layout = categoryLayout ?? defaultLayout;
+			const entry = layout.find(c => slugify(c.label) === dragHoverCatId);
+			if (entry && entry.label !== 'Bookmarks' && entry.label !== dragSourceLabel) {
+				placeIntoCategory(entry.label);
+			}
+		}
+
+		dragHoverCatId = null;
+		dragHoverTray = false;
+		dragApp = null;
+		dragSourceLabel = null;
+		detachDragListeners();
+		// pickedApp is cleared by placeIntoCategory / tray drop, or we cancel:
+		if (pickedApp) cancelPickup();
+	}
+
+	// Global Escape + outside-click cancel while a pickup is active.
+	$effect(() => {
+		if (!browser || !editMode || !pickedApp) return;
+		const onKey = (e) => { if (e.key === 'Escape') cancelPickup(); };
+		const onClick = (e) => {
+			if (gridEl?.contains(e.target)) return;
+			if (e.target.closest?.('.app-tray')) return;
+			cancelPickup();
+		};
+		window.addEventListener('keydown', onKey);
+		window.addEventListener('click', onClick, true);
+		return () => {
+			window.removeEventListener('keydown', onKey);
+			window.removeEventListener('click', onClick, true);
+		};
+	});
 
 	// Default width: 1 column per app on desktop, compact on mobile
 	function defaultWidth(appCount, mobile = false) {
@@ -184,6 +572,7 @@
 				grid.update(el, { x: item.x, y: item.y, w: item.w, h: item.h });
 				const inner = el.querySelector('.app-grid-inner');
 				if (inner) inner.style.setProperty('--cols', item.w);
+				categoryCols[item.id] = item.w;
 			}
 		} else {
 			// No saved layout for this breakpoint — recompute widths
@@ -195,6 +584,8 @@
 				const w = Math.min(defaultWidth(appCount, isMobile), cols);
 				grid.update(el, { w });
 				if (inner) inner.style.setProperty('--cols', w);
+				const gsId = el.getAttribute('gs-id');
+				if (gsId) categoryCols[gsId] = w;
 			}
 		}
 		grid.batchUpdate(false);
@@ -257,6 +648,8 @@
 			if (!newW) return;
 			const inner = (el._innerCache ??= el.querySelector('.app-grid-inner'));
 			if (inner) inner.style.setProperty('--cols', newW);
+			const gsId = el.getAttribute('gs-id');
+			if (gsId) categoryCols[gsId] = newW;
 			if (pendingResize.has(el)) return;
 			pendingResize.add(el);
 			requestAnimationFrame(() => {
@@ -272,6 +665,8 @@
 			if (newW) {
 				const inner = (el._innerCache ??= el.querySelector('.app-grid-inner'));
 				if (inner) inner.style.setProperty('--cols', newW);
+				const gsId = el.getAttribute('gs-id');
+				if (gsId) categoryCols[gsId] = newW;
 			}
 			requestAnimationFrame(() => {
 				if (!grid || !el.isConnected) return;
@@ -298,19 +693,43 @@
 		};
 	}
 
-	function toggleEditMode() {
-		editMode = !editMode;
-		if (grid) {
-			// Destroy and re-enable drag with updated handle
-			grid.enableMove(false);
-			grid.enableResize(false);
-			if (editMode) {
-				grid.opts.handle = null; // drag from anywhere
-				grid.enableMove(true);
-				grid.enableResize(true);
+	// React to editMode transitions regardless of who flipped the flag
+	// (inline Done button, gear-menu entry, future long-press, etc.)
+	let prevEditMode = false;
+	$effect(() => {
+		const current = editMode;
+		untrack(() => {
+			if (current === prevEditMode) return;
+			const leaving = !current && prevEditMode;
+			prevEditMode = current;
+
+			if (leaving) {
+				cancelPickup(); // abort any in-flight drag / pending long-press
+				if (grid && categoryLayout) {
+					for (const el of [...grid.getGridItems()]) {
+						const gsId = el.getAttribute('gs-id');
+						const entry = categoryLayout.find(c => slugify(c.label) === gsId);
+						if (entry && entry.appIds.length === 0) {
+							grid.removeWidget(el, false);
+						}
+					}
+					saveLayout();
+				}
 			}
-		}
-	}
+
+			if (grid) {
+				grid.enableMove(false);
+				grid.enableResize(false);
+				if (current) {
+					// Keep handle restricted to `.gs-drag-handle` (the category legend)
+					// so category tiles move from the header only. App-level drag is
+					// handled by our custom pointer logic directly on the app icons.
+					grid.enableMove(true);
+					grid.enableResize(true);
+				}
+			}
+		});
+	});
 
 	onMount(() => {
 		mounted = true;
@@ -334,6 +753,9 @@
 		return () => {
 			cancelled = true;
 			window.removeEventListener('click', dismiss);
+			// Tear down any in-flight drag/pending so we don't leave a
+			// floating clone or timer alive after the component unmounts.
+			cancelPickup();
 			cleanupGridListeners?.();
 			cleanupGridListeners = null;
 			if (grid) {
@@ -508,36 +930,69 @@
 	function iconClass(icon) { return getIconClass(iconStyle, icon); }
 </script>
 
-<!-- Edit mode toggle -->
-<div class="flex justify-end gap-2 mt-4 mb-2">
-	{#if editMode}
-		<button
-			onclick={resetLayout}
-			class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.7rem] font-medium transition-all duration-150 border bg-transparent text-content-dim border-transparent hover:text-content-muted hover:border-border-card"
-		>
-			<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-			Reset
-		</button>
-	{/if}
-	<button
-		onclick={toggleEditMode}
-		class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.7rem] font-medium transition-all duration-150 border {editMode ? 'bg-surface-card-strong text-content border-border-card' : 'bg-transparent text-content-dim border-transparent hover:text-content-muted hover:border-border-card'}"
-	>
-		{#if editMode}
-			<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-			Done
-		{:else}
-			<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-			Edit layout
+<!-- Fixed-height slot shared by SearchBar and the edit-mode tray. -->
+{#if searchEnabled || editMode}
+	{@const canScrollLeft = trayScrollPos > 0}
+	{@const canScrollRight = trayScrollPos < trayScrollMax}
+	<div class="edit-slot">
+		{#if searchEnabled}
+			<div class="edit-slot-pane {editMode ? 'is-hidden' : ''}" aria-hidden={editMode}>
+				<SearchBar bind:query={searchInput} apps={allAppsArr} onEditLayout={() => editMode = true} />
+			</div>
 		{/if}
-	</button>
-</div>
+		<div class="edit-slot-pane edit-slot-tray {editMode ? '' : 'is-hidden'}" aria-hidden={!editMode}>
+			<div class="app-tray {dragHoverTray ? 'tray-drop-hover' : ''}" role="toolbar" aria-label="Unplaced apps">
+				{#if trayApps.length === 0}
+					<div class="app-tray-empty flex-1">Everything placed. Click × on an app to move it here.</div>
+				{:else}
+					{#if canScrollLeft}
+						<button class="app-tray-arrow" aria-label="Scroll left" onclick={() => scrollTray(-1)}>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+						</button>
+					{/if}
+					<div class="app-tray-fade {canScrollLeft ? 'fade-left' : ''} {canScrollRight ? 'fade-right' : ''}">
+						<div class="app-tray-scroller" bind:this={trayScrollerEl} onscroll={onTrayScroll}>
+							{#each trayApps as app (app.id)}
+								<button
+									type="button"
+									class="app-tray-item {pickedApp?.id === app.id ? 'app-tray-item-selected' : ''}"
+									aria-label="Move {app.name} to a category"
+									title={app.name}
+									aria-pressed={pickedApp?.id === app.id}
+									onpointerdown={(e) => onAppPointerDown(e, app, null)}
+									onclick={(e) => { e.stopPropagation(); pickTrayApp(app, e.currentTarget); }}
+								>
+									<div class="app-icon-wrap w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
+										<AppIcon icon={app.icon} name={app.name} size="w-[18px] h-[18px]" {iconStyle} />
+									</div>
+								</button>
+							{/each}
+						</div>
+					</div>
+					{#if canScrollRight}
+						<button class="app-tray-arrow" aria-label="Scroll right" onclick={() => scrollTray(1)}>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+						</button>
+					{/if}
+				{/if}
+				<div class="app-tray-actions">
+					<button onclick={resetLayout} class="app-tray-reset" aria-label="Reset layout to default" title="Reset layout to default">Reset</button>
+					<button onclick={() => { editMode = false; }} class="app-tray-done" aria-label="Done editing">Done</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- aria-live announcer for pickup / place / cancel -->
+<div class="sr-only" aria-live="polite" aria-atomic="true">{announcerText}</div>
 
 <!-- GridStack container -->
-<div bind:this={gridEl} class="grid-stack mb-4 {editMode ? 'grid-edit-mode' : ''}">
-	{#each visibleCategories as category (category.label)}
+<div bind:this={gridEl} class="grid-stack mb-4 {editMode ? 'grid-edit-mode' : ''} {pickedApp ? 'picking' : ''}">
+	{#each renderCategories as category (category.label)}
 		{@const catId = slugify(category.label)}
-		{@const w = defaultWidth(category.apps.length)}
+		{@const w = categoryCols[catId] ?? defaultWidth(Math.max(category.apps.length, 2))}
+		{@const isBookmarks = category.label === 'Bookmarks'}
 		<div class="grid-stack-item"
 			gs-id={catId}
 			gs-w={w}
@@ -547,32 +1002,66 @@
 			gs-min-h="1"
 		>
 			<div class="grid-stack-item-content">
-				<fieldset class="category-card rounded-2xl py-4 px-1 {editMode ? 'category-card-edit' : ''} relative">
+				<fieldset
+					class="category-card rounded-2xl py-4 px-1 {editMode ? 'category-card-edit' : ''} {dragHoverCatId === catId ? 'drop-target-hover' : ''} relative"
+				>
 					<legend class="gs-drag-handle text-[0.65rem] text-content-muted tracking-wide px-2">{category.label}</legend>
 					{#if editMode}
-						<div class="edit-overlay"></div>
-					{/if}
-					<div class="app-grid-inner" style="--cols: {w}">
-						{#each category.apps as app (app.id)}
-							<a
-								href={editMode ? undefined : app.url}
-								target={openInNewTab && !editMode ? '_blank' : undefined}
-								rel={openInNewTab && !editMode ? 'noopener noreferrer' : undefined}
-								class="group relative flex flex-col items-center gap-2 no-underline w-full {editMode ? 'pointer-events-none' : ''}"
-								oncontextmenu={editMode ? undefined : (e) => showContext(app, e)}
-								ontouchstart={editMode ? undefined : (e) => startLongPress(app, e)}
-								ontouchend={editMode ? undefined : cancelLongPress}
-								ontouchmove={editMode ? undefined : cancelLongPress}
+						{#if dragHoverCatId === catId && pickedApp && !isBookmarks}
+							<div
+								class="drop-overlay"
+								role="button"
+								aria-label="Place {pickedApp.name} in {category.label}"
+								onclick={(e) => { e.stopPropagation(); placeIntoCategory(category.label); }}
 							>
-								<div class="app-icon-wrap w-11 h-11 rounded-[12px] max-md:w-12 max-md:h-12 max-md:rounded-[14px] flex items-center justify-center transition-opacity duration-150 group-hover:opacity-85 relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
-									{#key app.id}
-										<AppIcon icon={app.icon} name={app.name} size="w-6 h-6 max-md:w-7 max-md:h-7" {iconStyle} />
-									{/key}
+								<div class="drop-overlay-icon" style={iconStyle === 'colored' ? getBrandBgStyle(pickedApp.icon) : ''}>
+									<AppIcon icon={pickedApp.icon} name={pickedApp.name} size="w-5 h-5" {iconStyle} />
 								</div>
-								<span class="text-[0.65rem] font-medium text-center transition-colors duration-150 group-hover:text-content leading-tight w-full truncate text-content-muted">{app.name}</span>
-							</a>
-						{/each}
-					</div>
+								<span class="drop-overlay-text">Drop here</span>
+							</div>
+						{:else if pickedApp && !isBookmarks && pickedApp.id !== dragApp?.id}
+							<div
+								class="edit-overlay"
+								role="button"
+								aria-label="Place {pickedApp.name} in {category.label}"
+								onclick={(e) => { e.stopPropagation(); placeIntoCategory(category.label); }}
+							></div>
+						{/if}
+					{/if}
+					{#if editMode && category.apps.length === 0}
+						<div class="app-grid-empty" aria-hidden="true">Drop here</div>
+					{:else}
+						<div class="app-grid-inner" style="--cols: {w}">
+							{#each category.apps as app (app.id)}
+								<a
+									href={editMode ? undefined : app.url}
+									target={openInNewTab && !editMode ? '_blank' : undefined}
+									rel={openInNewTab && !editMode ? 'noopener noreferrer' : undefined}
+									class="group relative flex flex-col items-center gap-2 no-underline w-full {editMode && !isBookmarks ? 'app-draggable' : ''}"
+									oncontextmenu={editMode ? undefined : (e) => showContext(app, e)}
+									ontouchstart={editMode ? undefined : (e) => startLongPress(app, e)}
+									ontouchend={editMode ? undefined : cancelLongPress}
+									ontouchmove={editMode ? undefined : cancelLongPress}
+									onpointerdown={editMode && !isBookmarks ? (e) => onAppPointerDown(e, app, category.label) : undefined}
+								>
+									<div class="app-icon-wrap w-11 h-11 rounded-[12px] max-md:w-12 max-md:h-12 max-md:rounded-[14px] flex items-center justify-center transition-opacity duration-150 group-hover:opacity-85 relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
+										{#key app.id}
+											<AppIcon icon={app.icon} name={app.name} size="w-6 h-6 max-md:w-7 max-md:h-7" {iconStyle} />
+										{/key}
+									</div>
+									<span class="text-[0.65rem] font-medium text-center transition-colors duration-150 group-hover:text-content leading-tight w-full truncate text-content-muted">{app.name}</span>
+									{#if editMode && !isBookmarks}
+										<button
+											type="button"
+											class="app-remove-x"
+											aria-label="Remove {app.name} from dashboard"
+											onclick={(e) => { e.preventDefault(); e.stopPropagation(); removeFromCategory(app.id); }}
+										>×</button>
+									{/if}
+								</a>
+							{/each}
+						</div>
+					{/if}
 				</fieldset>
 			</div>
 		</div>

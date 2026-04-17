@@ -234,7 +234,7 @@
 			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 gap-1 border-b border-border-card overflow-x-auto items-center">
 				{#each [
 					{ id: 'appearance', label: 'Appearance' },
-					{ id: 'apps', label: 'Apps' },
+					{ id: 'apps', label: 'Bookmarks' },
 					{ id: 'widgets', label: 'Widgets' },
 					{ id: 'integrations', label: 'Integrations' }
 				] as tab}
@@ -264,7 +264,7 @@
 					<div class="flex flex-col gap-0.5">
 						{#each [
 							{ id: 'appearance', label: 'Appearance', svg: '<circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v-2M4.22 4.22l1.42 1.42m12.72 12.72-1.42-1.42M1 12h2m18 0h-2M4.22 19.78l1.42-1.42M18.36 5.64l-1.42 1.42"/>' },
-							{ id: 'apps', label: 'Apps', svg: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>' },
+							{ id: 'apps', label: 'Bookmarks', svg: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>' },
 							{ id: 'widgets', label: 'Widgets', svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>' },
 							{ id: 'integrations', label: 'Integrations', svg: '<path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v3a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-3a2 2 0 0 1 2-2z"/>' }
 						] as tab}
@@ -394,47 +394,28 @@
 
 				{:else if activeTab === 'apps'}
 				<!-- ═══ APPS TAB ═══ -->
+				<!-- Per-app visibility + per-category toggles have moved to the
+				     in-grid iOS-style edit mode. This tab is now just for
+				     bookmarks and — for admins — adding default apps. -->
 				<div class="mb-4">
-					<div class="text-[0.85rem] font-semibold text-content">Apps</div>
-					<div class="text-[0.7rem] text-content-dim mt-0.5">Toggle which apps appear on your dashboard.</div>
+					<div class="text-[0.85rem] font-semibold text-content">Bookmarks & Apps</div>
+					<div class="text-[0.7rem] text-content-dim mt-0.5">Use the grid's <span class="font-mono">Edit layout</span> button to show/hide or rearrange apps.</div>
 				</div>
-				{#each filteredCategories as category, i}
-					<div class="{i > 0 ? 'mt-4' : ''}">
-						<div class="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">{category.label}</div>
-						{#each category.apps as app}
-							<button
-								class="flex items-center gap-3 w-full px-3 py-2 rounded-lg bg-transparent border-none cursor-pointer hover:bg-surface-card-hover transition-colors text-left font-mono"
-								onclick={() => toggle(app.id)}
-							>
-								<AppIcon icon={app.icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
-								<span class="text-[0.8rem] text-content-muted flex-1">{app.name}</span>
-								<div class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0 {visibleSet.has(app.id) ? 'bg-surface-toggle-on' : 'bg-surface-toggle-off'}">
-									<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {visibleSet.has(app.id) ? 'translate-x-4' : 'translate-x-0.5'}"></div>
-								</div>
-							</button>
-						{/each}
-					</div>
-				{/each}
 
-				<!-- Admin-added default apps -->
-				{#if adminApps.length > 0}
-					<div class="mt-4">
+				<!-- Admin-added default apps (read-only here for non-admins; admin can remove) -->
+				{#if adminApps.length > 0 && isAdmin}
+					<div class="mt-2">
 						<div class="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">Added Apps</div>
 						{#each adminApps as app}
 							{@const icon = resolveIcon(app.icon)}
 							<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-card-hover transition-colors">
 								<AppIcon {icon} name={app.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 								<span class="text-[0.8rem] text-content-muted flex-1 truncate">{app.name}</span>
-								{#if isAdmin}
-									<button
-										class="bg-transparent border-none text-content-dim text-sm cursor-pointer hover:text-red-400 transition-colors p-1"
-										onclick={() => removeAdminApp(app.id)}
-										title="Remove"
-									>&times;</button>
-								{/if}
-								<div class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0 {visibleSet.has(app.id) ? 'bg-surface-toggle-on' : 'bg-surface-toggle-off'}" onclick={() => toggle(app.id)} role="switch" tabindex="0">
-									<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {visibleSet.has(app.id) ? 'translate-x-4' : 'translate-x-0.5'}"></div>
-								</div>
+								<button
+									class="bg-transparent border-none text-content-dim text-sm cursor-pointer hover:text-red-400 transition-colors p-1"
+									onclick={() => removeAdminApp(app.id)}
+									title="Remove"
+								>&times;</button>
 							</div>
 						{/each}
 					</div>
