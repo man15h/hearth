@@ -294,6 +294,18 @@
 	}
 
 	function cancelPickup() {
+		// Cancel any long-press timer and in-flight floating clone too,
+		// so Escape / editMode-exit / unmount leave no stuck state.
+		if (pendingDrag) {
+			clearTimeout(pendingDrag.holdTimer);
+			pendingDrag = null;
+		}
+		if (dragClone) { dragClone.remove(); dragClone = null; }
+		dragApp = null;
+		dragSourceLabel = null;
+		dragHoverTray = false;
+		dragHoverCatId = null;
+		detachDragListeners();
 		if (!pickedApp) return;
 		const anchor = pickedAnchor;
 		pickedApp = null;
@@ -302,61 +314,152 @@
 		if (anchor?.focus) requestAnimationFrame(() => anchor.focus());
 	}
 
-	// Resize every tile to its new content height. Double-rAF so the
-	// callback runs *after* Svelte has flushed the {#each} DOM update
+	// Resize only the tiles whose appIds changed between layouts. Double-rAF
+	// so the callback runs *after* Svelte has flushed the {#each} DOM update
 	// for the category we just mutated — a single rAF measures stale DOM.
-	function scheduleTileResize() {
+	function scheduleTileResize(changedIds) {
 		if (!grid) return;
 		requestAnimationFrame(() => requestAnimationFrame(() => {
 			if (!grid) return;
-			for (const el of grid.getGridItems()) grid.resizeToContent(el);
+			for (const el of grid.getGridItems()) {
+				const gsId = el.getAttribute('gs-id');
+				if (!changedIds || changedIds.has(gsId)) grid.resizeToContent(el);
+			}
 		}));
 	}
 
-	// Auto-resize on every layout mutation (add, remove, cross-move).
-	// Keyed off `categoryLayout` so any appIds change → re-measure.
+	// Auto-resize on layout mutation. On the first run (prev=null) we resize
+	// every tile; on subsequent runs we diff previous vs. current layout and
+	// only resize the categories whose appIds actually changed.
+	let prevCatLayout = null;
 	$effect(() => {
-		// touch the dep so svelte re-runs on change
-		void categoryLayout;
-		if (!mounted || !grid) return;
-		scheduleTileResize();
+		const cur = categoryLayout;
+		untrack(() => {
+			if (!mounted || !grid) return;
+			const prev = prevCatLayout;
+			prevCatLayout = cur;
+			if (!prev) { scheduleTileResize(null); return; }
+			const changed = new Set();
+			for (const c of cur || []) {
+				const p = prev.find(x => x.label === c.label);
+				if (!p || p.appIds.length !== c.appIds.length ||
+					!p.appIds.every((id, i) => id === c.appIds[i])) changed.add(slugify(c.label));
+			}
+			for (const p of prev) {
+				if (!(cur || []).find(c => c.label === p.label)) changed.add(slugify(p.label));
+			}
+			if (changed.size) scheduleTileResize(changed);
+		});
 	});
 
 	// ── Pointer-based drag (smooth iOS-like icon follow) ─────────
-	// pointerdown on tray item → floating clone follows finger/cursor →
-	// hit-test categories on move → "Drop here" overlay on hovered one
-	// only → pointerup to place or cancel. Touch-friendly by default.
+	// pointerdown on any app (tray or placed) → floating clone follows
+	// finger/cursor → hit-test categories + tray on move → pointerup
+	// resolves placement (cross-category move, send-to-tray, or cancel).
+	// Tray items use a long-press gate so short horizontal swipes scroll
+	// the strip instead of accidentally starting a drag.
 	let dragClone = null;
 	let dragApp = null;
+	let dragSourceLabel = null; // category label where drag started; null if from tray
+	let dragHoverTray = $state(false);
+	let pendingDrag = null; // { app, sourceLabel, target, pointerId, startX, startY, holdTimer }
+	let dragListenersAttached = false;
+	const LONG_PRESS_MS = 280;
+	const MOVE_CANCEL_PX = 8;
+	const CLONE_OFFSET = 20;
 
-	function onTrayPointerDown(e, app) {
-		if (e.button && e.button !== 0) return; // left / primary only
-		e.preventDefault();
-		e.stopPropagation();
-		e.currentTarget.setPointerCapture(e.pointerId);
+	function attachDragListeners() {
+		if (dragListenersAttached) return;
+		window.addEventListener('pointermove', onAppPointerMove);
+		window.addEventListener('pointerup', onAppPointerUp);
+		window.addEventListener('pointercancel', onAppPointerUp);
+		dragListenersAttached = true;
+	}
 
+	function detachDragListeners() {
+		if (!dragListenersAttached) return;
+		window.removeEventListener('pointermove', onAppPointerMove);
+		window.removeEventListener('pointerup', onAppPointerUp);
+		window.removeEventListener('pointercancel', onAppPointerUp);
+		dragListenersAttached = false;
+	}
+
+	function beginDrag(app, sourceLabel, target, pointerId, x, y) {
+		if (dragApp) return; // another drag already in-flight — don't overwrite state
+		try { target.setPointerCapture(pointerId); } catch {}
 		dragApp = app;
+		dragSourceLabel = sourceLabel ?? null;
 		pickedApp = app;
 		dragHoverCatId = null;
-
-		// Build a floating clone of the icon wrap.
-		const iconEl = e.currentTarget.querySelector('.app-icon-wrap');
+		dragHoverTray = false;
+		const iconEl = target.querySelector('.app-icon-wrap');
 		if (iconEl) {
 			dragClone = iconEl.cloneNode(true);
-			dragClone.className = 'drag-clone';
-			dragClone.style.left = `${e.clientX - 20}px`;
-			dragClone.style.top = `${e.clientY - 20}px`;
+			dragClone.classList.add('drag-clone');
+			dragClone.style.left = `${x - CLONE_OFFSET}px`;
+			dragClone.style.top = `${y - CLONE_OFFSET}px`;
 			document.body.appendChild(dragClone);
 		}
 	}
 
-	function onTrayPointerMove(e) {
+	function onAppPointerDown(e, app, sourceLabel) {
+		if (e.button && e.button !== 0) return; // left / primary only
+		e.stopPropagation();
+
+		// Listeners live on window for the duration of the gesture, so
+		// the drag survives re-renders that would otherwise strip per-element
+		// handlers (editMode flip, category reshuffle, etc.).
+		attachDragListeners();
+
+		// Category apps: drag begins immediately (no scroll to preserve).
+		if (sourceLabel !== null) {
+			e.preventDefault();
+			beginDrag(app, sourceLabel, e.currentTarget, e.pointerId, e.clientX, e.clientY);
+			return;
+		}
+
+		// Tray apps: wait for a long-press so horizontal swipes can still
+		// scroll the strip. Cancel if the user moves past MOVE_CANCEL_PX
+		// before the timer fires.
+		const target = e.currentTarget;
+		const pointerId = e.pointerId;
+		pendingDrag = {
+			app, sourceLabel, target, pointerId,
+			startX: e.clientX, startY: e.clientY,
+			holdTimer: setTimeout(() => {
+				if (!pendingDrag) return;
+				const p = pendingDrag; pendingDrag = null;
+				beginDrag(p.app, p.sourceLabel, p.target, p.pointerId, p.startX, p.startY);
+			}, LONG_PRESS_MS)
+		};
+	}
+
+	function cancelPending() {
+		if (!pendingDrag) return;
+		clearTimeout(pendingDrag.holdTimer);
+		pendingDrag = null;
+		if (!dragApp) detachDragListeners();
+	}
+
+	function onAppPointerMove(e) {
+		if (pendingDrag) {
+			const dx = Math.abs(e.clientX - pendingDrag.startX);
+			const dy = Math.abs(e.clientY - pendingDrag.startY);
+			if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) cancelPending();
+			return;
+		}
 		if (!dragClone) return;
 		dragClone.style.left = `${e.clientX - 20}px`;
 		dragClone.style.top = `${e.clientY - 20}px`;
 
-		// Hit-test: which category card is under the pointer?
+		// Hit-test: tray first (to allow sending a placed app back), then categories.
 		const underEl = document.elementFromPoint(e.clientX, e.clientY);
+		if (underEl?.closest?.('.app-tray')) {
+			dragHoverTray = !!dragSourceLabel; // only meaningful when the drag came from a category
+			dragHoverCatId = null;
+			return;
+		}
+		dragHoverTray = false;
 		const card = underEl?.closest?.('.category-card');
 		if (card) {
 			const gsItem = card.closest('.grid-stack-item');
@@ -367,23 +470,32 @@
 		}
 	}
 
-	function onTrayPointerUp(e) {
-		if (!dragApp) return;
+	function onAppPointerUp(e) {
+		if (pendingDrag) { cancelPending(); return; }
+		if (!dragApp) { detachDragListeners(); return; }
 		// Clean up the floating clone.
 		if (dragClone) { dragClone.remove(); dragClone = null; }
 
-		if (dragHoverCatId && gridEl) {
-			// Find the category label for this gs-id.
+		if (dragHoverTray && dragSourceLabel) {
+			// Send a placed app back to the tray.
+			removeFromCategory(dragApp.id);
+			announcerText = `Moved ${dragApp.name} to the tray.`;
+			pickedApp = null;
+			pickedAnchor = null;
+		} else if (dragHoverCatId && gridEl) {
 			const layout = categoryLayout ?? defaultLayout;
 			const entry = layout.find(c => slugify(c.label) === dragHoverCatId);
-			if (entry && entry.label !== 'Bookmarks') {
+			if (entry && entry.label !== 'Bookmarks' && entry.label !== dragSourceLabel) {
 				placeIntoCategory(entry.label);
 			}
 		}
 
 		dragHoverCatId = null;
+		dragHoverTray = false;
 		dragApp = null;
-		// pickedApp is cleared by placeIntoCategory, or we cancel:
+		dragSourceLabel = null;
+		detachDragListeners();
+		// pickedApp is cleared by placeIntoCategory / tray drop, or we cancel:
 		if (pickedApp) cancelPickup();
 	}
 
@@ -592,7 +704,7 @@
 			prevEditMode = current;
 
 			if (leaving) {
-				pickedApp = null;
+				cancelPickup(); // abort any in-flight drag / pending long-press
 				if (grid && categoryLayout) {
 					for (const el of [...grid.getGridItems()]) {
 						const gsId = el.getAttribute('gs-id');
@@ -609,7 +721,9 @@
 				grid.enableMove(false);
 				grid.enableResize(false);
 				if (current) {
-					grid.opts.handle = null;
+					// Keep handle restricted to `.gs-drag-handle` (the category legend)
+					// so category tiles move from the header only. App-level drag is
+					// handled by our custom pointer logic directly on the app icons.
 					grid.enableMove(true);
 					grid.enableResize(true);
 				}
@@ -639,6 +753,9 @@
 		return () => {
 			cancelled = true;
 			window.removeEventListener('click', dismiss);
+			// Tear down any in-flight drag/pending so we don't leave a
+			// floating clone or timer alive after the component unmounts.
+			cancelPickup();
 			cleanupGridListeners?.();
 			cleanupGridListeners = null;
 			if (grid) {
@@ -824,7 +941,7 @@
 			</div>
 		{/if}
 		<div class="edit-slot-pane edit-slot-tray {editMode ? '' : 'is-hidden'}" aria-hidden={!editMode}>
-			<div class="app-tray" role="toolbar" aria-label="Unplaced apps">
+			<div class="app-tray {dragHoverTray ? 'tray-drop-hover' : ''}" role="toolbar" aria-label="Unplaced apps">
 				{#if trayApps.length === 0}
 					<div class="app-tray-empty flex-1">Everything placed. Click × on an app to move it here.</div>
 				{:else}
@@ -842,10 +959,7 @@
 									aria-label="Move {app.name} to a category"
 									title={app.name}
 									aria-pressed={pickedApp?.id === app.id}
-									onpointerdown={(e) => onTrayPointerDown(e, app)}
-									onpointermove={onTrayPointerMove}
-									onpointerup={onTrayPointerUp}
-									onpointercancel={onTrayPointerUp}
+									onpointerdown={(e) => onAppPointerDown(e, app, null)}
 									onclick={(e) => { e.stopPropagation(); pickTrayApp(app, e.currentTarget); }}
 								>
 									<div class="app-icon-wrap w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
@@ -905,15 +1019,13 @@
 								</div>
 								<span class="drop-overlay-text">Drop here</span>
 							</div>
-						{:else if pickedApp && !isBookmarks}
+						{:else if pickedApp && !isBookmarks && pickedApp.id !== dragApp?.id}
 							<div
 								class="edit-overlay"
 								role="button"
 								aria-label="Place {pickedApp.name} in {category.label}"
 								onclick={(e) => { e.stopPropagation(); placeIntoCategory(category.label); }}
 							></div>
-						{:else}
-							<div class="edit-overlay"></div>
 						{/if}
 					{/if}
 					{#if editMode && category.apps.length === 0}
@@ -925,11 +1037,12 @@
 									href={editMode ? undefined : app.url}
 									target={openInNewTab && !editMode ? '_blank' : undefined}
 									rel={openInNewTab && !editMode ? 'noopener noreferrer' : undefined}
-									class="group relative flex flex-col items-center gap-2 no-underline w-full {editMode ? 'pointer-events-none' : ''}"
+									class="group relative flex flex-col items-center gap-2 no-underline w-full {editMode && !isBookmarks ? 'app-draggable' : ''}"
 									oncontextmenu={editMode ? undefined : (e) => showContext(app, e)}
 									ontouchstart={editMode ? undefined : (e) => startLongPress(app, e)}
 									ontouchend={editMode ? undefined : cancelLongPress}
 									ontouchmove={editMode ? undefined : cancelLongPress}
+									onpointerdown={editMode && !isBookmarks ? (e) => onAppPointerDown(e, app, category.label) : undefined}
 								>
 									<div class="app-icon-wrap w-11 h-11 rounded-[12px] max-md:w-12 max-md:h-12 max-md:rounded-[14px] flex items-center justify-center transition-opacity duration-150 group-hover:opacity-85 relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
 										{#key app.id}

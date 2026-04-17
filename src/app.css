@@ -373,6 +373,11 @@ body {
 	height: 56px;
 	margin-bottom: 0.75rem;
 }
+@media (max-width: 767px) {
+	/* On phones the tray wraps its Reset/Done actions to a second row
+	   so the icons strip stays wide. Slot grows to match the taller tray. */
+	.edit-slot { height: 92px; }
+}
 .edit-slot-pane {
 	position: absolute;
 	inset: 0;
@@ -461,6 +466,10 @@ body {
 	padding-right: 0.5rem;
 	margin-left: 0.5rem;
 }
+@media (max-width: 767px) {
+	.app-tray { flex-wrap: wrap; }
+	.app-tray-actions { flex-basis: 100%; justify-content: flex-end; margin-left: 0; padding: 0.25rem 0.5rem; }
+}
 .app-tray-reset {
 	display: flex;
 	align-items: center;
@@ -485,7 +494,7 @@ body {
 	align-items: center;
 	justify-content: center;
 	height: 28px;
-	padding: 0 0.75rem;
+	padding: 0 0.625rem;
 	background: transparent;
 	border: 1px solid var(--border-card, rgba(255, 255, 255, 0.12));
 	border-radius: 8px;
@@ -499,6 +508,9 @@ body {
 	background: rgba(255, 255, 255, 0.06);
 	border-color: var(--border-card, rgba(255, 255, 255, 0.2));
 }
+@media (min-width: 768px) {
+	.app-tray-done { padding: 0 0.75rem; }
+}
 
 .app-tray-item {
 	flex: 0 0 auto;
@@ -510,6 +522,12 @@ body {
 	border: 1px solid transparent;
 	border-radius: 12px;
 	cursor: grab;
+	/* Allow horizontal swipe to scroll the strip; the long-press gate
+	   in JS takes over once the user actually holds an icon. */
+	touch-action: pan-x;
+	-webkit-touch-callout: none;
+	user-select: none;
+	-webkit-user-select: none;
 }
 .app-tray-item:hover { border-color: var(--border-card, rgba(255, 255, 255, 0.1)); }
 .app-tray-item:active { cursor: grabbing; }
@@ -544,16 +562,17 @@ body {
 	outline-offset: 2px;
 }
 
-/* Floating drag clone — follows pointer during tray → category drag. */
+/* Floating drag clone — follows pointer during drag. The clone keeps the
+   source tile's own sizing/radius/brand-background classes so it matches
+   how the app looks in the grid; we only layer positioning + lift here. */
 .drag-clone {
 	position: fixed;
 	z-index: 9999;
 	pointer-events: none;
-	opacity: 0.9;
+	opacity: 0.95;
 	transform: scale(1.15);
-	filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+	filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.45));
 	transition: transform 80ms ease;
-	border-radius: 10px;
 }
 
 /* "Drop here" overlay — shown when a tray app is picked up. */
@@ -596,6 +615,18 @@ body {
 .drop-target-hover .drop-overlay {
 	background: rgba(15, 15, 17, 0.85);
 }
+
+/* Tray becomes a drop target while dragging a placed app back. */
+.app-tray.tray-drop-hover {
+	border-color: var(--accent, #6ea8fe);
+	background: rgba(15, 15, 17, 0.85);
+}
+
+/* Draggable app icons inside categories during edit mode. `pan-y` keeps
+   vertical page scrolling alive while still letting the pointer-drag
+   override horizontal pan once it commits via pointerdown. */
+.app-draggable { cursor: grab; touch-action: pan-y; }
+.app-draggable:active { cursor: grabbing; }
 
 /* Drag handle */
 .gs-drag-handle { cursor: default; user-select: none; }
