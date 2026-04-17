@@ -2,7 +2,6 @@
 	import { prefs } from '$lib/stores/prefs.js';
 	import { adminApps } from '$lib/stores/adminApps.js';
 	import Header from '$lib/components/Header.svelte';
-	import SearchBar from '$lib/components/SearchBar.svelte';
 	import AppGrid from '$lib/components/AppGrid.svelte';
 
 	import Footer from '$lib/components/Footer.svelte';
@@ -26,7 +25,7 @@
 	let guideApp = $state(null);
 	let menuOpen = $state(false);
 	let manageAppsOpen = $state(false);
-	let searchQuery = $state('');
+	let editMode = $state(false);
 
 	import { buildAppsFromConfig } from '$lib/apps.js';
 	import { getContext } from 'svelte';
@@ -125,13 +124,8 @@
 			<Header lat={$prefs.lat} lon={$prefs.lon} hasLocation={!!($prefs.lat && $prefs.lon)} showWeather={weatherEnabled} headlines={newsEnabled ? data.news : []} />
 
 		</div>
-		{#if searchEnabled}
-			<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:75ms] relative z-30">
-				<SearchBar bind:query={searchQuery} apps={allApps} />
-			</div>
-		{/if}
-		<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:150ms] relative z-20">
-			<AppGrid isAdmin={data.isAdmin} bind:guideApp search={searchQuery} />
+		<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:75ms] relative z-20">
+			<AppGrid isAdmin={data.isAdmin} bind:guideApp bind:editMode {searchEnabled} />
 		</div>
 		{#if tipsEnabled}
 			<div class="opacity-0 animate-fade-in [animation-fill-mode:both] [animation-delay:250ms]">
@@ -146,6 +140,22 @@
 		<PrivacyTerms bind:open={privacyOpen} standalone />
 	{/if}
 	<SettingsButton bind:open={menuOpen} onmanageapps={customizationEnabled ? () => manageAppsOpen = true : null} showAuth={authEnabled} />
+	<!-- Fallback edit entry when the SearchBar widget is disabled -->
+	{#if customizationEnabled && !searchEnabled && !editMode}
+		<button
+			onclick={() => editMode = true}
+			aria-label="Edit home screen"
+			title="Rearrange apps"
+			class="fixed top-6 right-[calc(1.5rem+2.75rem)] max-md:top-auto max-md:right-16 max-md:bottom-16 w-9 h-9 rounded-[10px] glass-card text-content-dim hover:text-content flex items-center justify-center cursor-pointer transition-colors duration-150 z-[60] shadow-theme"
+		>
+			<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="3" y="3" width="7" height="7" rx="1.5"/>
+				<rect x="14" y="3" width="7" height="7" rx="1.5"/>
+				<rect x="3" y="14" width="7" height="7" rx="1.5"/>
+				<path d="M14 17.5h7M17.5 14v7"/>
+			</svg>
+		</button>
+	{/if}
 	{#if customizationEnabled}
 		<ManageApps bind:open={manageAppsOpen} isAdmin={data.isAdmin} />
 	{/if}

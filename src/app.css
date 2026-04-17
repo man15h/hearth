@@ -366,17 +366,58 @@ body {
 
 /* ── iOS-style edit mode: tray, × remove, pickup pulse ───────── */
 
+/* Fixed-height container that holds both SearchBar and the edit-mode tray.
+   The swap is a pure opacity cross-fade — no reflow of siblings below. */
+.edit-slot {
+	position: relative;
+	height: 56px;
+	margin-bottom: 0.75rem;
+}
+.edit-slot-pane {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	transition: opacity 200ms ease-out;
+}
+.edit-slot-pane > * {
+	width: 100%;
+}
+.edit-slot-pane.is-hidden {
+	opacity: 0;
+	pointer-events: none;
+}
+
 .app-tray {
-	position: sticky;
-	top: 0;
-	z-index: 30;
-	margin: 0 0 0.75rem;
-	padding: 0.5rem 0.25rem;
+	width: 100%;
+	height: 100%;
+	padding: 0;
 	border-radius: 14px;
 	border: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
 	background: rgba(15, 15, 17, 0.72);
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
+	display: flex;
+	align-items: center;
+}
+
+/* Edge fade — conditional via .fade-left / .fade-right */
+.app-tray-fade {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+.app-tray-fade.fade-right {
+	-webkit-mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent);
+	mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent);
+}
+.app-tray-fade.fade-left {
+	-webkit-mask-image: linear-gradient(to right, transparent, black 2rem);
+	mask-image: linear-gradient(to right, transparent, black 2rem);
+}
+.app-tray-fade.fade-left.fade-right {
+	-webkit-mask-image: linear-gradient(to right, transparent, black 2rem, black calc(100% - 2rem), transparent);
+	mask-image: linear-gradient(to right, transparent, black 2rem, black calc(100% - 2rem), transparent);
 }
 
 .app-tray-scroller {
@@ -384,9 +425,10 @@ body {
 	flex-wrap: nowrap;
 	overflow-x: auto;
 	gap: 0.75rem;
-	padding: 0.25rem 0.5rem;
-	scrollbar-width: thin;
+	padding: 0.25rem 0.75rem;
+	scrollbar-width: none;
 }
+.app-tray-scroller::-webkit-scrollbar { display: none; }
 
 .app-tray-empty {
 	font-size: 0.7rem;
@@ -395,12 +437,75 @@ body {
 	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
 }
 
+/* Left / right nav arrows */
+.app-tray-arrow {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0;
+	transition: color 150ms;
+}
+.app-tray-arrow:hover { color: var(--text); }
+
+.app-tray-actions {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding-right: 0.5rem;
+	margin-left: 0.5rem;
+}
+.app-tray-reset {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 28px;
+	padding: 0 0.5rem;
+	background: transparent;
+	border: none;
+	border-radius: 8px;
+	color: var(--text-muted);
+	font-size: 0.72rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: color 150ms, background 150ms;
+}
+.app-tray-reset:hover {
+	color: var(--text);
+	background: rgba(255, 255, 255, 0.06);
+}
+.app-tray-done {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 28px;
+	padding: 0 0.75rem;
+	background: transparent;
+	border: 1px solid var(--border-card, rgba(255, 255, 255, 0.12));
+	border-radius: 8px;
+	color: var(--text);
+	font-size: 0.72rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 150ms, border-color 150ms;
+}
+.app-tray-done:hover {
+	background: rgba(255, 255, 255, 0.06);
+	border-color: var(--border-card, rgba(255, 255, 255, 0.2));
+}
+
 .app-tray-item {
 	flex: 0 0 auto;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 0.25rem;
+	padding: 0;
 	background: transparent;
 	border: 1px solid transparent;
 	border-radius: 12px;

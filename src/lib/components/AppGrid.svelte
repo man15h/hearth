@@ -1,17 +1,19 @@
 <script>
-	import { onMount, getContext } from 'svelte';
+	import { onMount, getContext, untrack } from 'svelte';
 	import { prefs } from '$lib/stores/prefs.js';
 	import { adminApps as adminAppsStore } from '$lib/stores/adminApps.js';
 	import { buildAppsFromConfig, resolveIcon } from '$lib/apps.js';
 	import { getIconSrc, getIconClass, handleIconError, getBrandBgStyle, getBrandIconClass } from '$lib/iconHelpers.js';
 	import AppIcon from '$lib/components/AppIcon.svelte';
+	import SearchBar from '$lib/components/SearchBar.svelte';
 
 	import { browser } from '$app/environment';
 
 	const siteConfig = getContext('config');
 	const { categories, defaultAppIds, setupGuides } = buildAppsFromConfig(siteConfig?.apps);
 
-	let { isAdmin = false, guideApp = $bindable(null), search = '' } = $props();
+	let { isAdmin = false, guideApp = $bindable(null), editMode = $bindable(false), searchEnabled = false } = $props();
+	let searchInput = $state('');
 	let platform = $state('desktop');
 
 	// Lock body scroll when setup guide modal is open
@@ -161,7 +163,8 @@
 	});
 
 	// Search: flat list of matching apps across all rendered categories
-	const searchQuery = $derived(search.trim().toLowerCase());
+	const searchQuery = $derived(searchInput.trim().toLowerCase());
+	const allAppsArr = $derived(Array.from(allApps.values()).map(v => v.app));
 	const searchResults = $derived.by(() => {
 		if (!searchQuery) return null;
 		const matches = [];
@@ -191,7 +194,6 @@
 	// ── GridStack ──
 	let gridEl = $state(null);
 	let grid = null;
-	let editMode = $state(false);
 	// Cleanup for GridStack-attached listeners (window resize, debounce timer).
 	// Closure-scoped so it survives teardown even if `grid` is nulled first.
 	let cleanupGridListeners = null;
@@ -203,6 +205,32 @@
 	// `apps.length` so dropping a new app into a full tile wraps to
 	// a new row instead of squishing icons.
 	let categoryCols = $state({});
+
+	// ── Tray scroll ──────────────────────────────────────────────
+	let trayScrollerEl = $state(null);
+	let trayScrollPos = $state(0);
+	let trayScrollMax = $state(0);
+
+	function onTrayScroll() {
+		if (!trayScrollerEl) return;
+		trayScrollPos = Math.round(trayScrollerEl.scrollLeft);
+		trayScrollMax = trayScrollerEl.scrollWidth - trayScrollerEl.clientWidth;
+	}
+
+	function scrollTray(direction) {
+		if (!trayScrollerEl) return;
+		const page = trayScrollerEl.clientWidth * 0.8;
+		trayScrollerEl.scrollBy({ left: direction * page, behavior: 'smooth' });
+	}
+
+	$effect(() => {
+		void trayApps;
+		if (!trayScrollerEl) return;
+		requestAnimationFrame(() => {
+			trayScrollPos = Math.round(trayScrollerEl.scrollLeft);
+			trayScrollMax = trayScrollerEl.scrollWidth - trayScrollerEl.clientWidth;
+		});
+	});
 
 	// ── iOS-style edit state ────────────────────────────────────────
 	// When set, every category card pulses and the next category click
@@ -553,37 +581,41 @@
 		};
 	}
 
-	function toggleEditMode() {
-		const leaving = editMode;
-		// Cancel any in-flight pickup when leaving edit.
-		if (leaving) pickedApp = null;
+	// React to editMode transitions regardless of who flipped the flag
+	// (inline Done button, gear-menu entry, future long-press, etc.)
+	let prevEditMode = false;
+	$effect(() => {
+		const current = editMode;
+		untrack(() => {
+			if (current === prevEditMode) return;
+			const leaving = !current && prevEditMode;
+			prevEditMode = current;
 
-		// When leaving edit mode, drop GridStack widgets for categories that
-		// will no longer render (empty after user removed everything). We
-		// pass removeDOM=false and let Svelte do the DOM removal.
-		if (leaving && grid && categoryLayout) {
-			for (const el of [...grid.getGridItems()]) {
-				const gsId = el.getAttribute('gs-id');
-				const entry = categoryLayout.find(c => slugify(c.label) === gsId);
-				if (entry && entry.appIds.length === 0) {
-					grid.removeWidget(el, false);
+			if (leaving) {
+				pickedApp = null;
+				if (grid && categoryLayout) {
+					for (const el of [...grid.getGridItems()]) {
+						const gsId = el.getAttribute('gs-id');
+						const entry = categoryLayout.find(c => slugify(c.label) === gsId);
+						if (entry && entry.appIds.length === 0) {
+							grid.removeWidget(el, false);
+						}
+					}
+					saveLayout();
 				}
 			}
-			saveLayout();
-		}
 
-		editMode = !editMode;
-		if (grid) {
-			// Destroy and re-enable drag with updated handle
-			grid.enableMove(false);
-			grid.enableResize(false);
-			if (editMode) {
-				grid.opts.handle = null; // drag from anywhere
-				grid.enableMove(true);
-				grid.enableResize(true);
+			if (grid) {
+				grid.enableMove(false);
+				grid.enableResize(false);
+				if (current) {
+					grid.opts.handle = null;
+					grid.enableMove(true);
+					grid.enableResize(true);
+				}
 			}
-		}
-	}
+		});
+	});
 
 	onMount(() => {
 		mounted = true;
@@ -781,57 +813,59 @@
 	function iconClass(icon) { return getIconClass(iconStyle, icon); }
 </script>
 
-<!-- Edit mode toggle -->
-<div class="flex justify-end gap-2 mt-4 mb-2">
-	{#if editMode}
-		<button
-			onclick={resetLayout}
-			class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.7rem] font-medium transition-all duration-150 border bg-transparent text-content-dim border-transparent hover:text-content-muted hover:border-border-card"
-		>
-			<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-			Reset
-		</button>
-	{/if}
-	<button
-		onclick={toggleEditMode}
-		class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.7rem] font-medium transition-all duration-150 border {editMode ? 'bg-surface-card-strong text-content border-border-card' : 'bg-transparent text-content-dim border-transparent hover:text-content-muted hover:border-border-card'}"
-	>
-		{#if editMode}
-			<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-			Done
-		{:else}
-			<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-			Edit layout
+<!-- Fixed-height slot shared by SearchBar and the edit-mode tray. -->
+{#if searchEnabled || editMode}
+	{@const canScrollLeft = trayScrollPos > 0}
+	{@const canScrollRight = trayScrollPos < trayScrollMax}
+	<div class="edit-slot">
+		{#if searchEnabled}
+			<div class="edit-slot-pane {editMode ? 'is-hidden' : ''}" aria-hidden={editMode}>
+				<SearchBar bind:query={searchInput} apps={allAppsArr} onEditLayout={() => editMode = true} />
+			</div>
 		{/if}
-	</button>
-</div>
-
-<!-- Tray (iOS-style): sticky strip above the grid while editing -->
-{#if editMode}
-	<div class="app-tray" role="toolbar" aria-label="Unplaced apps">
-		<div class="app-tray-scroller">
-			{#if trayApps.length === 0}
-				<div class="app-tray-empty">Everything placed. Click × on an app to move it here.</div>
-			{:else}
-				{#each trayApps as app (app.id)}
-					<button
-						type="button"
-						class="app-tray-item {pickedApp?.id === app.id ? 'app-tray-item-selected' : ''}"
-						aria-label="Move {app.name} to a category"
-						title={app.name}
-						aria-pressed={pickedApp?.id === app.id}
-						onpointerdown={(e) => onTrayPointerDown(e, app)}
-						onpointermove={onTrayPointerMove}
-						onpointerup={onTrayPointerUp}
-						onpointercancel={onTrayPointerUp}
-						onclick={(e) => { e.stopPropagation(); pickTrayApp(app, e.currentTarget); }}
-					>
-						<div class="app-icon-wrap w-10 h-10 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
-							<AppIcon icon={app.icon} name={app.name} size="w-5 h-5" {iconStyle} />
+		<div class="edit-slot-pane edit-slot-tray {editMode ? '' : 'is-hidden'}" aria-hidden={!editMode}>
+			<div class="app-tray" role="toolbar" aria-label="Unplaced apps">
+				{#if trayApps.length === 0}
+					<div class="app-tray-empty flex-1">Everything placed. Click × on an app to move it here.</div>
+				{:else}
+					{#if canScrollLeft}
+						<button class="app-tray-arrow" aria-label="Scroll left" onclick={() => scrollTray(-1)}>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+						</button>
+					{/if}
+					<div class="app-tray-fade {canScrollLeft ? 'fade-left' : ''} {canScrollRight ? 'fade-right' : ''}">
+						<div class="app-tray-scroller" bind:this={trayScrollerEl} onscroll={onTrayScroll}>
+							{#each trayApps as app (app.id)}
+								<button
+									type="button"
+									class="app-tray-item {pickedApp?.id === app.id ? 'app-tray-item-selected' : ''}"
+									aria-label="Move {app.name} to a category"
+									title={app.name}
+									aria-pressed={pickedApp?.id === app.id}
+									onpointerdown={(e) => onTrayPointerDown(e, app)}
+									onpointermove={onTrayPointerMove}
+									onpointerup={onTrayPointerUp}
+									onpointercancel={onTrayPointerUp}
+									onclick={(e) => { e.stopPropagation(); pickTrayApp(app, e.currentTarget); }}
+								>
+									<div class="app-icon-wrap w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden" style={iconStyle === 'colored' ? getBrandBgStyle(app.icon) : ''}>
+										<AppIcon icon={app.icon} name={app.name} size="w-[18px] h-[18px]" {iconStyle} />
+									</div>
+								</button>
+							{/each}
 						</div>
-					</button>
-				{/each}
-			{/if}
+					</div>
+					{#if canScrollRight}
+						<button class="app-tray-arrow" aria-label="Scroll right" onclick={() => scrollTray(1)}>
+							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+						</button>
+					{/if}
+				{/if}
+				<div class="app-tray-actions">
+					<button onclick={resetLayout} class="app-tray-reset" aria-label="Reset layout to default" title="Reset layout to default">Reset</button>
+					<button onclick={() => { editMode = false; }} class="app-tray-done" aria-label="Done editing">Done</button>
+				</div>
+			</div>
 		</div>
 	</div>
 {/if}
