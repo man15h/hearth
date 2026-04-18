@@ -176,6 +176,7 @@ integrations:
   immich:
     enabled: true                             # Omit or set false to hide entirely
     name: "Photos"                            # Optional — overrides adapter's default display name
+    shortcut: "photos"                        # Optional — !<shortcut> in the search bar scopes results to this integration (adapter default shown)
     default_url: "https://immich.example.com" # Optional — pre-fills & locks the URL field for users
     surfaces:                                 # Which surfaces this instance is allowed to power
       search: true                            # Photo search in the search bar

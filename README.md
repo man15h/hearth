@@ -32,6 +32,8 @@ Most self-hosted dashboards are admin tools: one person configures them, one per
 - **News headlines** — any RSS feed
 - **Integrations** — pluggable app adapters (Immich, Paperless, Nextcloud, Planka, Karakeep) with encrypted per-user credentials
 - **Unified search** — apps, web search, and integration results in one Spotlight-style dropdown
+- **Command prefixes** — `!p` / `!b` / `!photos` scope search to one integration; `!settings` / `!theme` / `!icon` / `!wall` / `!logout` fire quick actions
+- **Keyboard shortcuts** — `⌘K` / `Ctrl+K` focuses search from anywhere; `↑ ↓` navigate results; `Esc` closes modals and overlays
 - **Search bar** — configurable fallback search engine (Google, SearXNG, etc.)
 - **PWA support** — installable as a native app on mobile
 - **Docker** — single container, multi-arch (amd64/arm64)
