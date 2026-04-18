@@ -90,6 +90,19 @@
 		prevOpen = open;
 	});
 
+	// Close on Escape while the modal is open
+	$effect(() => {
+		if (!browser || !open) return;
+		function onKey(e) {
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				open = false;
+			}
+		}
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
+
 
 	function toggle(appId) {
 		const next = new Set(visibleSet);
@@ -230,14 +243,18 @@
 			class="glass-card rounded-2xl w-full max-w-[620px] h-[520px] max-md:max-w-full max-md:h-[75vh] max-md:rounded-xl overflow-hidden animate-modal-enter shadow-theme relative flex flex-col"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<button
-				class="absolute top-4 right-5 bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content z-10"
-				onclick={() => open = false}
-				aria-label="Close"
-			>&times;</button>
+			<!-- Header strip -->
+			<div class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border-card">
+				<span class="text-[0.8rem] font-semibold text-content">Configure</span>
+				<button
+					class="bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content w-6 h-6 flex items-center justify-center"
+					onclick={() => open = false}
+					aria-label="Close"
+				>&times;</button>
+			</div>
 
 			<!-- Mobile: horizontal tabs -->
-			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 pr-10 gap-1 border-b border-border-card overflow-x-auto items-center">
+			<div class="hidden max-md:flex shrink-0 px-3 pt-2 pb-1 gap-1 border-b border-border-card overflow-x-auto items-center">
 				{#each [
 					{ id: 'appearance', label: 'Appearance' },
 					{ id: 'apps', label: 'Apps' },
@@ -254,7 +271,7 @@
 			<!-- Tabbed layout: sidebar (desktop) + content -->
 			<div class="flex flex-1 min-h-0">
 				<!-- Sidebar — hidden on mobile -->
-				<div class="w-[160px] shrink-0 px-2.5 pt-10 pb-3 flex flex-col max-md:hidden">
+				<div class="w-[160px] shrink-0 px-2.5 pt-3 pb-3 flex flex-col max-md:hidden">
 					<div class="flex flex-col gap-0.5">
 						{#each [
 							{ id: 'appearance', label: 'Appearance', svg: '<circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v-2M4.22 4.22l1.42 1.42m12.72 12.72-1.42-1.42M1 12h2m18 0h-2M4.22 19.78l1.42-1.42M18.36 5.64l-1.42 1.42"/>' },
