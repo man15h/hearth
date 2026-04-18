@@ -20,7 +20,7 @@ export async function GET({ cookies, url }) {
 	const integrations = registry.map(({ adapter, icon, operator, availableSurfaces }) => {
 		const conn = byId.get(adapter.id);
 		return {
-			...adapterToClient(adapter, { icon, name: operator?.name, tip: operator?.tip }),
+			...adapterToClient(adapter, { icon, name: operator?.name, tip: operator?.tip, shortcut: operator?.shortcut }),
 			operatorDefaults: pickOperatorDefaults(adapter, operator),
 			availableSurfaces,
 			userState: {

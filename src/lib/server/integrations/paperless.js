@@ -7,6 +7,8 @@
 const adapter = {
 	id: 'paperless',
 	name: 'Paperless-ngx',
+	icon: 'di:paperless-ngx',
+	shortcut: 'd',
 	description: 'Document management with full-text search',
 
 	configSchema: [

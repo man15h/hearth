@@ -5,6 +5,8 @@
 
 	let { iconStyle = 'colored' } = $props();
 
+	let expandedId = $state(null);
+
 	onMount(() => {
 		integrationsStore.load();
 	});
@@ -35,7 +37,13 @@
 	{:else}
 		<div class="flex flex-col gap-1">
 			{#each $integrationsStore.integrations as integration (integration.id)}
-				<IntegrationCard {integration} {iconStyle} />
+				<IntegrationCard
+					{integration}
+					{iconStyle}
+					expanded={expandedId === integration.id}
+					onExpandRequest={() => expandedId = integration.id}
+					onCollapseRequest={() => { if (expandedId === integration.id) expandedId = null; }}
+				/>
 			{/each}
 		</div>
 	{/if}
