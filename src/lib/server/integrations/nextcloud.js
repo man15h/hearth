@@ -8,6 +8,8 @@
 const adapter = {
 	id: 'nextcloud',
 	name: 'Nextcloud',
+	icon: 'di:nextcloud',
+	shortcut: 'f',
 	description: 'File storage with search',
 
 	configSchema: [

@@ -5,7 +5,16 @@
 	import { integrations as integrationsStore } from '$lib/stores/integrations.js';
 	import { resolveIcon } from '$lib/apps.js';
 
-	let { integration, iconStyle = 'colored' } = $props();
+	let {
+		integration,
+		iconStyle = 'colored',
+		expanded = false,
+		onExpandRequest = () => {},
+		onCollapseRequest = () => {}
+	} = $props();
+
+	let cardEl = $state(null);
+	let formEl = $state(null);
 
 	const icon = $derived(resolveIcon(integration.icon));
 
@@ -29,7 +38,6 @@
 
 	let formConfig = $state(seedConfig());
 	let formSurfaces = $state(seedSurfaces());
-	let expanded = $state(false);
 	let contextOpen = $state(false);
 	let menuEl = $state(null);
 	let testStatus = $state(null);
@@ -72,13 +80,13 @@
 			}
 			const willConnectFresh = !connected;
 			const surfacesToSave = { ...formSurfaces };
-			if (willConnectFresh && hasSearch && surfacesToSave.search !== false) {
+			if (willConnectFresh && hasSearch) {
 				surfacesToSave.search = true;
 				formSurfaces = surfacesToSave;
 			}
 			await integrationsStore.save(integration.id, { config: formConfig, surfaces: surfacesToSave });
 			dirty = false;
-			expanded = false;
+			onCollapseRequest();
 		} catch (err) {
 			saveError = err.message || 'Save failed';
 		} finally {
@@ -97,7 +105,7 @@
 			formSurfaces = seedSurfaces();
 			testStatus = null;
 			dirty = false;
-			expanded = false;
+			onCollapseRequest();
 		} finally {
 			saving = false;
 		}
@@ -122,9 +130,9 @@
 	}
 
 	function handleRowClick() {
-		if (!connected) {
-			expanded = !expanded;
-		}
+		if (connected) return;
+		if (expanded) onCollapseRequest();
+		else onExpandRequest();
 	}
 
 	function openContext(e) {
@@ -134,8 +142,18 @@
 
 	function editConnection() {
 		contextOpen = false;
-		expanded = true;
+		onExpandRequest();
 	}
+
+	$effect(() => {
+		if (expanded && cardEl) {
+			cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
+		if (expanded && formEl) {
+			const first = formEl.querySelector('input:not([readonly]):not([disabled])');
+			if (first) first.focus();
+		}
+	});
 
 	// Close context menu on click outside
 	$effect(() => {
@@ -155,21 +173,25 @@
 	});
 </script>
 
-<div class="rounded-lg">
-	<!-- Row -->
+<div
+	bind:this={cardEl}
+	class="rounded-lg transition-colors {expanded ? 'border border-border-pill bg-surface-card/30' : 'border border-transparent'}"
+>
+	<!-- Row (acts as header when expanded) -->
 	<div
-		class="flex items-center gap-3 px-3 py-2.5 rounded-lg {!connected ? 'cursor-pointer' : ''} hover:bg-surface-card-hover transition-colors"
-		onclick={handleRowClick}
-		role={!connected ? 'button' : undefined}
-		tabindex={!connected ? 0 : undefined}
-		onkeydown={!connected ? (e) => e.key === 'Enter' && handleRowClick() : undefined}
+		class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
 	>
 		<AppIcon {icon} name={integration.name} size="w-3.5 h-3.5" wrapSize="w-5 h-5" {iconStyle} wrap />
 		<div class="flex-1 min-w-0">
 			<span class="text-[0.8rem] text-content font-medium">{integration.name}</span>
 		</div>
 		<div class="flex items-center gap-2">
-			{#if connected}
+			{#if expanded}
+				<button
+					class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card bg-transparent cursor-pointer hover:text-content hover:bg-surface-card-hover transition-colors"
+					onclick={onCollapseRequest}
+				>Cancel</button>
+			{:else if connected}
 				<span class="text-[0.7rem] font-mono text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-400/30 bg-emerald-500/5">Connected</span>
 				<div class="relative" bind:this={menuEl}>
 					<button
@@ -195,14 +217,17 @@
 					{/if}
 				</div>
 			{:else}
-				<span class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card">Connect</span>
+				<button
+					class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card bg-transparent cursor-pointer hover:text-content hover:bg-surface-card-hover transition-colors"
+					onclick={handleRowClick}
+				>Connect</button>
 			{/if}
 		</div>
 	</div>
 
 	<!-- Expandable config form -->
 	{#if expanded}
-		<div class="px-3 pb-3 pt-1 space-y-3">
+		<div bind:this={formEl} class="px-3 pb-3 pt-3 space-y-3 border-t border-border-card" data-form-type="other">
 			{#if integration.tip}
 				<div class="text-[0.65rem] text-content-dim/70 leading-relaxed px-2 py-1.5 rounded-lg bg-surface-card/40 border border-border-card">
 					{integration.tip}
@@ -220,8 +245,11 @@
 							oninput={markDirty}
 							readonly={!!lockedByOperator}
 							class="w-full bg-surface-input border border-border-input rounded-lg px-3 py-2 text-[0.8rem] text-content font-mono placeholder:text-content-dim outline-none focus:border-border-pill {lockedByOperator ? 'opacity-60 cursor-not-allowed' : ''}"
-							autocomplete="off"
+							autocomplete={field.type === 'secret' ? 'new-password' : 'off'}
 							spellcheck="false"
+							data-1p-ignore="true"
+							data-lpignore="true"
+							data-bwignore="true"
 						/>
 						{#if lockedByOperator}
 							<span class="block text-[0.6rem] text-content-dim mt-1">Set by your administrator</span>
@@ -254,7 +282,7 @@
 					</div>
 				{/if}
 
-				<div class="flex gap-2 pt-1">
+				<div class="flex gap-2 pt-1 justify-end">
 					<button
 						class="py-1.5 px-3 rounded-lg text-[0.75rem] font-mono bg-transparent text-content-dim border border-border-card cursor-pointer hover:text-content transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 						disabled={testing}
@@ -269,7 +297,7 @@
 			</div>
 
 			<!-- Surface toggles -->
-			{#if (hasSearch || hasWidgets) && connected}
+			{#if connected}
 				<div class="space-y-2 pt-2 border-t border-border-card">
 					<div class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">Use for</div>
 					{#if hasSearch}
@@ -283,14 +311,12 @@
 							</div>
 						</button>
 					{/if}
-					{#if hasWidgets}
-						<div class="flex items-center justify-between py-1 opacity-50" title="Coming in a future release">
-							<span class="text-[0.75rem] text-content-muted">Widgets <span class="text-[0.6rem] text-content-dim">— coming soon</span></span>
-							<div class="w-9 h-5 rounded-full bg-surface-toggle-off relative shrink-0">
-								<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow translate-x-0.5"></div>
-							</div>
+					<div class="flex items-center justify-between py-1 opacity-50" title="Coming in a future release">
+						<span class="text-[0.75rem] text-content-muted">Widgets <span class="text-[0.6rem] text-content-dim">(soon)</span></span>
+						<div class="w-9 h-5 rounded-full bg-surface-toggle-off relative shrink-0">
+							<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow translate-x-0.5"></div>
 						</div>
-					{/if}
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -301,7 +327,8 @@
 	.field-help :global(ol),
 	.field-help :global(ul) {
 		margin: 0.25rem 0;
-		padding-left: 1.2rem;
+		padding-left: 0;
+		list-style-position: inside;
 	}
 	.field-help :global(li) {
 		margin: 0.1rem 0;

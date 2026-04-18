@@ -10,6 +10,8 @@
 const adapter = {
 	id: 'immich',
 	name: 'Immich',
+	icon: 'di:immich',
+	shortcut: 'photos',
 	description: 'Photo library with smart search',
 
 	configSchema: [

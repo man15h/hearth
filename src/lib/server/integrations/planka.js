@@ -36,6 +36,8 @@ function setCachedCards(cacheKey, cards) {
 const adapter = {
 	id: 'planka',
 	name: 'Planka',
+	icon: 'di:planka',
+	shortcut: 'p',
 	description: 'Kanban boards with card search',
 
 	configSchema: [
@@ -121,6 +123,7 @@ const adapter = {
 							title: card.name,
 							subtitle,
 							href: `${base}/cards/${card.id}`,
+							tags: card.labelNames || [],
 							meta: { kind: 'card' }
 						};
 					})
@@ -160,12 +163,26 @@ async function fetchAllCards(base, config, fetch) {
 		const data = await res.json();
 		const cards = data?.included?.cards || [];
 		const lists = data?.included?.lists || [];
-		const listMap = new Map(lists.map((l) => [l.id, l.name]));
-		return cards.map((c) => ({
-			...c,
-			boardName: board.name,
-			listName: listMap.get(c.listId) || null
-		}));
+		const labels = data?.included?.labels || [];
+		const cardLabels = data?.included?.cardLabels || [];
+		const listMap = new Map(lists.map((l) => [l.id, l]));
+		const labelMap = new Map(labels.map((l) => [l.id, l.name]));
+		const cardLabelsMap = new Map();
+		for (const cl of cardLabels) {
+			const name = labelMap.get(cl.labelId);
+			if (!name) continue;
+			const arr = cardLabelsMap.get(cl.cardId) || [];
+			arr.push(name);
+			cardLabelsMap.set(cl.cardId, arr);
+		}
+		return cards
+			.filter((c) => listMap.get(c.listId)?.type === 'active')
+			.map((c) => ({
+				...c,
+				boardName: board.name,
+				listName: listMap.get(c.listId)?.name || null,
+				labelNames: cardLabelsMap.get(c.id) || []
+			}));
 	});
 
 	return (await Promise.all(boardFetches)).flat();
