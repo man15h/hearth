@@ -322,7 +322,14 @@
 		const dismiss = (e) => {
 			if (contextMenuEl && !contextMenuEl.contains(e.target)) contextApp = null;
 		};
+		const onEsc = (e) => {
+			if (e.key === 'Escape' && guideApp) {
+				e.preventDefault();
+				guideApp = null;
+			}
+		};
 		window.addEventListener('click', dismiss);
+		window.addEventListener('keydown', onEsc);
 
 		// Init GridStack after Svelte has rendered the DOM.
 		// `cancelled` guards against the component unmounting before either the
@@ -334,6 +341,7 @@
 		return () => {
 			cancelled = true;
 			window.removeEventListener('click', dismiss);
+			window.removeEventListener('keydown', onEsc);
 			cleanupGridListeners?.();
 			cleanupGridListeners = null;
 			if (grid) {
@@ -623,20 +631,23 @@
 	{@const guide = setupGuides[guideApp.name]}
 	<div use:portal class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in" onclick={() => guideApp = null}>
 		<div class="glass-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme relative" onclick={(e) => e.stopPropagation()}>
-			<button class="absolute top-4 right-5 bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content z-10" onclick={() => guideApp = null}>&times;</button>
-
-			<!-- Header with icon color glow -->
-			<div class="p-8 pb-6">
-				<div class="flex items-center gap-3.5 mb-1">
+			<!-- Header with icon color glow + close -->
+			<div class="p-8 pb-6 border-b border-border-card relative">
+				<button
+					class="absolute top-4 right-5 bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content w-6 h-6 flex items-center justify-center"
+					onclick={() => guideApp = null}
+					aria-label="Close"
+				>&times;</button>
+				<div class="flex items-center gap-3.5 mb-1 pr-8">
 					<div class="app-icon-wrap w-12 h-12 rounded-[14px] flex items-center justify-center relative overflow-hidden shrink-0">
 						{#if iconStyle === 'colored' && guideApp.icon?.colored}
 							<img src={guideApp.icon.colored} alt="" class="absolute inset-0 w-full h-full scale-150 blur-xl opacity-40 pointer-events-none" />
 						{/if}
 						<AppIcon icon={guideApp.icon} name={guideApp.name} size="w-7 h-7" {iconStyle} className={iconStyle === 'colored' ? 'relative z-10' : ''} />
 					</div>
-					<div>
-						<h3 class="text-[1.2rem] font-semibold text-content m-0">{guide.title}</h3>
-						<p class="text-[0.8rem] text-content-dim m-0">{guide.subtitle}</p>
+					<div class="min-w-0">
+						<h3 class="text-[1.2rem] font-semibold text-content m-0 truncate">{guide.title}</h3>
+						<p class="text-[0.8rem] text-content-dim m-0 truncate">{guide.subtitle}</p>
 					</div>
 				</div>
 			</div>

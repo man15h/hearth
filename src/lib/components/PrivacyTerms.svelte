@@ -1,5 +1,6 @@
 <script>
 	import { getContext } from 'svelte';
+	import { browser } from '$app/environment';
 
 	const siteConfig = getContext('config');
 	const brandName = siteConfig?.branding?.name || 'Hearth';
@@ -14,6 +15,19 @@
 		document.body.appendChild(node);
 		return { destroy() { if (node.parentNode) node.parentNode.removeChild(node); } };
 	}
+
+	// Close on Escape while the modal is open
+	$effect(() => {
+		if (!browser || !open) return;
+		function onKey(e) {
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				open = false;
+			}
+		}
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
 </script>
 
 {#if open}
@@ -21,29 +35,37 @@
 		use:portal
 		class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in"
 		onclick={() => open = false}
-		onkeydown={(e) => e.key === 'Escape' && (open = false)}
-		role="button"
-		tabindex="-1"
 	>
-	<div class="glass-card rounded-2xl p-8 w-full max-w-[480px] max-h-[80vh] overflow-y-auto shadow-theme animate-modal-enter text-content-dim text-[0.78rem] leading-[1.7] relative" onclick={(e) => e.stopPropagation()}>
-		<button class="absolute top-4 right-5 bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content" onclick={() => open = false}>&times;</button>
-		<h2 class="text-base font-semibold text-content mb-1">Privacy & Terms</h2>
-		{#if lastUpdated}
-		<p class="opacity-50 text-[0.7rem]">Last updated: {lastUpdated}</p>
-		{/if}
+	<div class="glass-card rounded-2xl w-full max-w-[480px] max-h-[80vh] overflow-hidden shadow-theme animate-modal-enter flex flex-col relative" onclick={(e) => e.stopPropagation()}>
+		<!-- Header strip -->
+		<div class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border-card">
+			<span class="text-[0.8rem] font-semibold text-content">Privacy & Terms</span>
+			<button
+				class="bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content w-6 h-6 flex items-center justify-center"
+				onclick={() => open = false}
+				aria-label="Close"
+			>&times;</button>
+		</div>
 
-		{#if privacyHtml}
-			<div class="privacy-md">{@html privacyHtml}</div>
-		{:else}
-			{#each sections as section}
-				<h3 class="text-[0.8rem] font-semibold text-content mt-5 mb-1">{section.title}</h3>
-				<ul class="pl-5 my-1">
-					{#each section.items as item}
-						<li class="mb-0.5">{item}</li>
-					{/each}
-				</ul>
-			{/each}
-		{/if}
+		<!-- Body -->
+		<div class="p-8 pt-5 overflow-y-auto text-content-dim text-[0.78rem] leading-[1.7]">
+			{#if lastUpdated}
+			<p class="opacity-50 text-[0.7rem] mt-0">Last updated: {lastUpdated}</p>
+			{/if}
+
+			{#if privacyHtml}
+				<div class="privacy-md">{@html privacyHtml}</div>
+			{:else}
+				{#each sections as section}
+					<h3 class="text-[0.8rem] font-semibold text-content mt-5 mb-1">{section.title}</h3>
+					<ul class="pl-5 my-1">
+						{#each section.items as item}
+							<li class="mb-0.5">{item}</li>
+						{/each}
+					</ul>
+				{/each}
+			{/if}
+		</div>
 	</div>
 	</div>
 {/if}
