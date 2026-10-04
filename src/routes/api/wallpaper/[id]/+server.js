@@ -1,16 +1,21 @@
 export async function GET({ params }) {
 	const id = params.id.replace(/[^0-9]/g, '').padStart(4, '0');
-	const upstream = `https://gitlab.com/dwt1/wallpapers/-/raw/master/${id}.jpg`;
+	const original = `https://gitlab.com/dwt1/wallpapers/-/raw/master/${id}.jpg`;
+	// Re-encoded as WebP through wsrv (same as the thumb route), capped at
+	// 1920px wide and never enlarged: ~40% smaller than the source JPEGs.
+	// Falls back to the original if wsrv is slow or down.
+	const optimized = `https://wsrv.nl/?url=${encodeURIComponent(original)}&w=1920&we&output=webp&q=80`;
 
-	const res = await fetch(upstream);
-	if (!res.ok) {
+	let res = await fetch(optimized, { signal: AbortSignal.timeout(8000) }).catch(() => null);
+	if (!res?.ok) res = await fetch(original, { signal: AbortSignal.timeout(15000) }).catch(() => null);
+	if (!res?.ok) {
 		return new Response('Not found', { status: 404 });
 	}
 
 	return new Response(res.body, {
 		headers: {
 			'Content-Type': res.headers.get('Content-Type') || 'image/jpeg',
-			'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
+			'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
 		}
 	});
 }
