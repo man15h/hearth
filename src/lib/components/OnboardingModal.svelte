@@ -1,4 +1,5 @@
 <script>
+	import { dialog } from '$lib/actions/dialog.js';
 	import { browser } from '$app/environment';
 	import { getContext } from 'svelte';
 	import { prefs } from '$lib/stores/prefs.js';
@@ -178,7 +179,7 @@
 </script>
 
 {#if step === 'welcome'}
-	<div class="fixed inset-0 flex flex-col items-center justify-center z-[100] p-4">
+	<div use:dialog class="fixed inset-0 flex flex-col items-center justify-center z-[100] p-4">
 		<!-- Wallpaper background -->
 		<div class="fixed inset-0 -z-20 bg-surface">
 			{#if wallpaperUrl}
@@ -237,7 +238,7 @@
 	</div>
 
 {:else if step === 'onboarding'}
-	<div class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in">
+	<div use:dialog={{ label: 'Welcome' }} class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in">
 		<div class="bg-surface-modal-card backdrop-blur-[120px] border border-border-modal-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme">
 
 			<!-- Slide content -->

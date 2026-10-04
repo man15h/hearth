@@ -1,4 +1,5 @@
 <script>
+	import { dialog } from '$lib/actions/dialog.js';
 	import { onMount, untrack, getContext } from 'svelte';
 	import { browser } from '$app/environment';
 	import { prefs } from '$lib/stores/prefs.js';
@@ -839,7 +840,7 @@
 <!-- Setup Guide Modal (portal to body) -->
 {#if guideApp && setupGuides[guideApp.name]}
 	{@const guide = setupGuides[guideApp.name]}
-	<div use:portal class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in" onclick={() => (guideApp = null)}>
+	<div use:portal use:dialog={{ label: `${guideApp.name} setup` }} class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in" onclick={() => (guideApp = null)}>
 		<div class="glass-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme relative" onclick={(e) => e.stopPropagation()}>
 			<!-- Header with icon color glow + close -->
 			<div class="p-8 pb-6 border-b border-border-card relative">
