@@ -40,13 +40,20 @@
 		prevOpen = open;
 	});
 
+	// Every close path goes through here so unsaved integration edits
+	// (marked data-unsaved by IntegrationCard) aren't dropped silently.
+	function requestClose() {
+		if (document.querySelector('[data-unsaved]') && !confirm('Discard unsaved changes?')) return;
+		open = false;
+	}
+
 	// Close on Escape while the modal is open
 	$effect(() => {
 		if (!browser || !open) return;
 		function onKey(e) {
 			if (e.key === 'Escape') {
 				e.preventDefault();
-				open = false;
+				requestClose();
 			}
 		}
 		window.addEventListener('keydown', onKey);
@@ -127,7 +134,7 @@
 	<div
 		use:portal
 		class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in"
-		onclick={() => open = false}
+		onclick={requestClose}
 	>
 		<div
 			class="glass-card rounded-2xl w-full max-w-[620px] h-[520px] max-md:max-w-full max-md:h-[75vh] max-md:rounded-xl overflow-hidden animate-modal-enter shadow-theme relative flex flex-col"
@@ -138,7 +145,7 @@
 				<span class="text-[0.8rem] font-semibold text-content">Configure</span>
 				<button
 					class="bg-transparent border-none text-content-dim text-2xl cursor-pointer leading-none hover:text-content w-6 h-6 flex items-center justify-center"
-					onclick={() => open = false}
+					onclick={requestClose}
 					aria-label="Close"
 				>&times;</button>
 			</div>

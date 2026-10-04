@@ -29,6 +29,11 @@
 
 	{#if $integrationsStore.loading && !$integrationsStore.loaded}
 		<div class="text-[0.75rem] text-content-dim font-mono px-1 py-2">Loading integrations…</div>
+	{:else if $integrationsStore.error}
+		<div class="text-[0.75rem] text-content-dim font-mono px-1 py-2 leading-relaxed">
+			Couldn't load integrations.
+			<button class="bg-transparent border-none p-0 text-content-muted underline cursor-pointer font-mono text-[0.75rem]" onclick={() => integrationsStore.load()}>Retry</button>
+		</div>
 	{:else if $integrationsStore.integrations.length === 0}
 		<div class="text-[0.75rem] text-content-dim font-mono px-1 py-2 leading-relaxed">
 			No integrations enabled. Ask your administrator to add an

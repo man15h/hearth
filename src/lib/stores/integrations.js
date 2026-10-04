@@ -8,7 +8,7 @@ import { browser } from '$app/environment';
 // in-flight loads share the same promise.
 
 function createIntegrationsStore() {
-	const state = writable({ loaded: false, loading: false, integrations: [] });
+	const state = writable({ loaded: false, loading: false, error: '', integrations: [] });
 	let inflight = null;
 
 	async function fetchAndSet() {
@@ -16,10 +16,11 @@ function createIntegrationsStore() {
 			const res = await fetch('/api/integrations');
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
-			state.set({ loaded: true, loading: false, integrations: data.integrations || [] });
+			state.set({ loaded: true, loading: false, error: '', integrations: data.integrations || [] });
 		} catch (err) {
 			console.error('[integrations] fetch failed:', err);
-			state.set({ loaded: true, loading: false, integrations: [] });
+			// loaded stays false so the next load() retries instead of caching the failure
+			state.set({ loaded: false, loading: false, error: err.message || 'Failed to load', integrations: [] });
 		} finally {
 			inflight = null;
 		}

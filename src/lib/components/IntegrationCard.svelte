@@ -61,6 +61,8 @@
 		testStatus = null;
 		try {
 			testStatus = await integrationsStore.test(integration.id, formConfig);
+		} catch (err) {
+			testStatus = { ok: false, message: err.message || 'Test failed' };
 		} finally {
 			testing = false;
 		}
@@ -70,7 +72,7 @@
 		saving = true;
 		saveError = '';
 		try {
-			if (!connected && !testStatus?.ok) {
+			if ((!connected || dirty) && !testStatus?.ok) {
 				const res = await integrationsStore.test(integration.id, formConfig);
 				testStatus = res;
 				if (!res.ok) {
@@ -106,9 +108,21 @@
 			testStatus = null;
 			dirty = false;
 			onCollapseRequest();
+		} catch (err) {
+			saveError = err.message || 'Disconnect failed';
 		} finally {
 			saving = false;
 		}
+	}
+
+	// Cancel throws away edits, so reopening shows the saved state again.
+	function cancelEdit() {
+		formConfig = seedConfig();
+		formSurfaces = seedSurfaces();
+		testStatus = null;
+		saveError = '';
+		dirty = false;
+		onCollapseRequest();
 	}
 
 	async function toggleSurface(surface) {
@@ -162,7 +176,10 @@
 			if (menuEl && !menuEl.contains(e.target)) contextOpen = false;
 		}
 		function escape(e) {
-			if (e.key === 'Escape') contextOpen = false;
+			if (e.key !== 'Escape') return;
+			// Close just this menu, not the Configure modal around it.
+			e.stopPropagation();
+			contextOpen = false;
 		}
 		document.addEventListener('mousedown', close);
 		document.addEventListener('keydown', escape);
@@ -173,8 +190,10 @@
 	});
 </script>
 
+<!-- data-unsaved lets ManageApps confirm before closing over typed edits -->
 <div
 	bind:this={cardEl}
+	data-unsaved={expanded && dirty ? '' : undefined}
 	class="rounded-lg transition-colors {expanded ? 'border border-border-pill bg-surface-card/30' : 'border border-transparent'}"
 >
 	<!-- Row (acts as header when expanded) -->
@@ -189,7 +208,7 @@
 			{#if expanded}
 				<button
 					class="text-[0.7rem] font-mono text-content-dim px-2.5 py-1 rounded-lg border border-border-card bg-transparent cursor-pointer hover:text-content hover:bg-surface-card-hover transition-colors"
-					onclick={onCollapseRequest}
+					onclick={cancelEdit}
 				>Cancel</button>
 			{:else if connected}
 				<span class="text-[0.7rem] font-mono text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-400/30 bg-emerald-500/5">Connected</span>
