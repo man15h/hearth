@@ -280,6 +280,9 @@
 	let contextAnchor = $state(null);
 	let contextMenuEl = $state(null);
 	let longPressTimer = null;
+	// Set when a long-press opened the menu, so the click that follows the
+	// finger lifting doesn't also open the app.
+	let longPressFired = false;
 
 	function showContext(app, e) {
 		e.preventDefault();
@@ -290,11 +293,17 @@
 
 	function startLongPress(app, e) {
 		const target = e.currentTarget;
+		longPressFired = false;
 		longPressTimer = setTimeout(() => {
-			e.preventDefault();
+			longPressFired = true;
 			contextAnchor = target;
 			contextApp = app;
 		}, 500);
+	}
+
+	function endLongPress(e) {
+		if (longPressFired) e.preventDefault();
+		cancelLongPress();
 	}
 
 	function cancelLongPress() {
@@ -710,15 +719,16 @@
 						title={app.name}
 						aria-label={app.name}
 						onclick={(e) => {
-							if (editMode) {
+							if (editMode || longPressFired) {
 								e.preventDefault();
+								longPressFired = false;
 								return;
 							}
 							recordAppOpen(app.id);
 						}}
 						oncontextmenu={editMode ? undefined : (e) => showContext(app, e)}
 						ontouchstart={editMode ? undefined : (e) => startLongPress(app, e)}
-						ontouchend={editMode ? undefined : cancelLongPress}
+						ontouchend={editMode ? undefined : endLongPress}
 						ontouchmove={editMode ? undefined : cancelLongPress}
 					>
 						<div
@@ -1209,6 +1219,10 @@
 		text-decoration: none;
 		color: var(--color-content, #e4e4e7);
 		transition: background 200ms var(--ease-standard, ease);
+		/* Long-press opens our menu; suppress iOS's link preview and text selection */
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 	.app-tile-link:hover {
 		background: rgba(255, 255, 255, 0.05);
