@@ -273,11 +273,11 @@
 								<div class="flex items-center gap-3 px-2 py-2.5 min-w-0 overflow-hidden">
 									<AppIcon icon={svc.icon} name={svc.name} size="w-4 h-4" wrapSize="w-6 h-6" wrap />
 									<span class="text-[0.8rem] text-content font-medium shrink-0">{svc.name}</span>
-									{#if svc.desc}<span class="text-[0.7rem] text-content-dim ml-auto text-right max-md:text-[0.6rem] truncate">{svc.desc}</span>{/if}
+									{#if svc.desc}<span class="text-[0.7rem] text-content-dim ml-auto text-right truncate">{svc.desc}</span>{/if}
 								</div>
 							{/each}
 						</div>
-						<p class="text-content-dim/50 text-[0.65rem] mt-auto pt-4 text-center">All self-hosted on our hardware. Your data never leaves.</p>
+						<p class="text-content-dim/50 text-[0.7rem] mt-auto pt-4 text-center">All self-hosted on our hardware. Your data never leaves.</p>
 					</div>
 
 				{:else if currentSlideType() === 'privacy' || currentSlideType() === 'security' || currentSlideType() === 'list'}
@@ -306,7 +306,7 @@
 							{/each}
 						</div>
 						{#if s.footer}
-							<p class="text-content-dim/50 text-[0.65rem] mt-auto pt-4 text-center">{s.footer}</p>
+							<p class="text-content-dim/50 text-[0.7rem] mt-auto pt-4 text-center">{s.footer}</p>
 						{/if}
 					</div>
 
@@ -342,10 +342,11 @@
 			<!-- Bottom bar: dots + navigation -->
 			<div class="p-6 pt-4 flex items-center justify-between">
 				<!-- Dot indicators -->
-				<div class="flex gap-1.5">
+				<div class="flex gap-3">
 					{#each Array(totalSlides) as _, i}
+						<!-- 6px dot, ~18x30px tap area via ::before -->
 						<button
-							class="w-1.5 h-1.5 rounded-full border-none cursor-pointer transition-all duration-200 p-0 {i === slide ? 'dot-active w-4' : 'dot-inactive'}"
+							class="relative w-1.5 h-1.5 rounded-full border-none cursor-pointer transition-all duration-200 p-0 before:absolute before:content-[''] before:-inset-x-1.5 before:-inset-y-3 {i === slide ? 'dot-active w-4' : 'dot-inactive'}"
 							onclick={() => slide = i}
 						></button>
 					{/each}

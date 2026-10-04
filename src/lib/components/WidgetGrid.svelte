@@ -995,7 +995,7 @@
 	   grid + Reset/Done row). Mirrors the chip typography (size, tracking,
 	   muted tone) so the edit surface reads as one tonal family. */
 	.edit-hint {
-		font-size: 0.6rem;
+		font-size: 0.7rem;
 		letter-spacing: 0.06em;
 		color: var(--color-content-dim, #a1a1aa);
 		opacity: 0.7;
@@ -1008,7 +1008,7 @@
 	   primary action without breaking out into a colored CTA. */
 	.tray-reset,
 	.tray-done {
-		font-size: 0.6rem;
+		font-size: 0.7rem;
 		letter-spacing: 0.06em;
 		padding: 0.2rem 0.6rem;
 		border-radius: 9999px;
@@ -1089,7 +1089,7 @@
 	}
 	.picker-section-label {
 		padding: 0.4rem 0.5rem 0.2rem;
-		font-size: 0.5rem;
+		font-size: 0.65rem;
 		font-weight: 700;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
@@ -1167,17 +1167,24 @@
 		margin-bottom: 1rem;
 	}
 	.edit-chip {
-		font-size: 0.6rem;
+		font-size: 0.7rem;
 		letter-spacing: 0.06em;
 		padding: 0.2rem 0.6rem;
+		position: relative;
 		border-radius: 9999px;
 		background: transparent;
 		border: 1px solid rgba(255, 255, 255, 0.10);
 		color: var(--color-content-dim, #a1a1aa);
-		opacity: 0.7;
+		opacity: 0.85;
 		cursor: pointer;
 		transition: background 180ms var(--ease-standard, ease),
 			border-color 180ms, color 180ms, opacity 180ms;
+	}
+	/* Pill stays small; the tap area is ~32px tall */
+	.edit-chip::before {
+		content: '';
+		position: absolute;
+		inset: -0.45rem -0.25rem;
 	}
 	.edit-chip:hover,
 	.edit-chip:focus-visible {
@@ -1240,7 +1247,7 @@
 		flex-shrink: 0;
 	}
 	.app-tile-name {
-		font-size: 0.65rem;
+		font-size: 0.7rem;
 		text-align: center;
 		max-width: 100%;
 		overflow: hidden;
@@ -1268,6 +1275,12 @@
 	}
 	.app-tile-remove:hover {
 		background: rgba(220, 38, 38, 0.85);
+	}
+	/* 18px badge, ~34px hit area */
+	.app-tile-remove::before {
+		content: '';
+		position: absolute;
+		inset: -8px;
 	}
 
 	/* Drag handle cursor — restricted to the tile itself; the inner link

@@ -248,7 +248,7 @@
 	{#if expanded}
 		<div bind:this={formEl} class="px-3 pb-3 pt-3 space-y-3 border-t border-border-card" data-form-type="other">
 			{#if integration.tip}
-				<div class="text-[0.65rem] text-content-dim/70 leading-relaxed px-2 py-1.5 rounded-lg bg-surface-card/40 border border-border-card">
+				<div class="text-[0.7rem] text-content-dim/70 leading-relaxed px-2 py-1.5 rounded-lg bg-surface-card/40 border border-border-card">
 					{integration.tip}
 				</div>
 			{/if}
@@ -271,10 +271,10 @@
 							data-bwignore="true"
 						/>
 						{#if lockedByOperator}
-							<span class="block text-[0.6rem] text-content-dim mt-1">Set by your administrator</span>
+							<span class="block text-[0.7rem] text-content-dim mt-1">Set by your administrator</span>
 						{:else}
 							{#if field.help}
-								<div class="field-help text-[0.6rem] text-content-dim mt-1.5 leading-relaxed">
+								<div class="field-help text-[0.7rem] text-content-dim mt-1.5 leading-relaxed">
 									{@html marked.parse(field.help)}
 								</div>
 							{/if}
@@ -283,7 +283,7 @@
 									href="{formConfig[field.helpUrl.baseKey]}{field.helpUrl.path}"
 									target="_blank"
 									rel="noopener noreferrer"
-									class="inline-block text-[0.6rem] text-blue-400 hover:text-blue-300 mt-1 no-underline hover:underline"
+									class="inline-block text-[0.7rem] text-blue-400 hover:text-blue-300 mt-1 no-underline hover:underline"
 								>{field.helpUrl.label} ↗</a>
 							{/if}
 						{/if}
@@ -318,7 +318,7 @@
 			<!-- Surface toggles -->
 			{#if connected}
 				<div class="space-y-2 pt-2 border-t border-border-card">
-					<div class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim">Use for</div>
+					<div class="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-content-dim">Use for</div>
 					{#if hasSearch}
 						<button
 							class="flex items-center justify-between w-full bg-transparent border-none cursor-pointer text-left py-1"
@@ -331,7 +331,7 @@
 						</button>
 					{/if}
 					<div class="flex items-center justify-between py-1 opacity-50" title="Coming in a future release">
-						<span class="text-[0.75rem] text-content-muted">Widgets <span class="text-[0.6rem] text-content-dim">(soon)</span></span>
+						<span class="text-[0.75rem] text-content-muted">Widgets <span class="text-[0.7rem] text-content-dim">(soon)</span></span>
 						<div class="w-9 h-5 rounded-full bg-surface-toggle-off relative shrink-0">
 							<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow translate-x-0.5"></div>
 						</div>
@@ -360,7 +360,7 @@
 		font-weight: 600;
 	}
 	.field-help :global(code) {
-		font-size: 0.58rem;
+		font-size: 0.65rem;
 		background: var(--card-bg, rgba(255,255,255,0.05));
 		padding: 0.1rem 0.25rem;
 		border-radius: 3px;

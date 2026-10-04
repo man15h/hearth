@@ -187,7 +187,7 @@
 					</div>
 					<div class="mt-auto pt-3">
 						<button
-							class="text-[0.65rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono px-3"
+							class="text-[0.7rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono px-3"
 							onclick={resetDefaults}
 						>Reset defaults</button>
 					</div>
@@ -205,7 +205,7 @@
 
 				<!-- Theme -->
 				<div class="mb-5">
-					<div class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">Theme</div>
+					<div class="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">Theme</div>
 					<div class="flex gap-6">
 						{#each themes as t}
 							<button
@@ -218,7 +218,7 @@
 
 				<!-- Icon style -->
 				<div class="mb-5">
-					<div class="text-[0.55rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">Icon style</div>
+					<div class="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-content-dim mb-2">Icon style</div>
 					<div class="flex gap-6">
 						{#each iconStyles as style}
 							<button
@@ -290,7 +290,7 @@
 								disabled={wallpaperPage === 0}
 								onclick={() => wallpaperPage--}
 							>← Prev</button>
-							<span class="text-[0.65rem] text-content-dim font-mono">{wallpaperPage + 1} / {totalPages}</span>
+							<span class="text-[0.7rem] text-content-dim font-mono">{wallpaperPage + 1} / {totalPages}</span>
 							<button
 								class="text-[0.7rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono disabled:opacity-30 disabled:cursor-not-allowed"
 								disabled={wallpaperPage >= totalPages - 1}
@@ -319,7 +319,7 @@
 						<span class="text-base shrink-0">{widget.icon}</span>
 						<div class="flex-1 min-w-0">
 							<div class="text-[0.8rem] text-content font-medium">{widget.name}</div>
-							<div class="text-[0.65rem] text-content-dim">{widget.desc}</div>
+							<div class="text-[0.7rem] text-content-dim">{widget.desc}</div>
 						</div>
 						<div class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0 {enabledWidgets.has(widget.id) ? 'bg-surface-toggle-on' : 'bg-surface-toggle-off'}">
 							<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {enabledWidgets.has(widget.id) ? 'translate-x-4' : 'translate-x-0.5'}"></div>

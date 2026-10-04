@@ -562,7 +562,7 @@
 		{#if query}
 			<button type="button" class="clear-btn text-sm md:text-base bg-transparent border-none cursor-pointer px-1" onclick={() => { query = ''; inputEl?.focus(); }}>&times;</button>
 		{:else}
-			<kbd class="hero-search-kbd text-[0.6rem] md:text-[0.7rem] py-0.5 px-1.5 md:py-1 md:px-2 rounded border font-mono shrink-0">/</kbd>
+			<kbd class="hero-search-kbd text-[0.65rem] md:text-[0.7rem] py-0.5 px-1.5 md:py-1 md:px-2 rounded border font-mono shrink-0">/</kbd>
 		{/if}
 	</form>
 

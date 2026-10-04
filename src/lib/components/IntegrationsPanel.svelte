@@ -16,7 +16,7 @@
 	<div class="mb-3">
 		<div class="flex items-center gap-2">
 			<div class="text-[0.85rem] font-semibold text-content">Integrations</div>
-			<span class="text-[0.55rem] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-card-strong text-content-muted border border-border-card">Alpha</span>
+			<span class="text-[0.65rem] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-card-strong text-content-muted border border-border-card">Alpha</span>
 		</div>
 		<div class="text-[0.7rem] text-content-dim mt-0.5">Connect your apps to search and interact with them from Hearth.</div>
 	</div>
