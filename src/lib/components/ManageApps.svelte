@@ -26,17 +26,21 @@
 	const totalPages = Math.ceil(TOTAL_WALLPAPERS / WALLPAPERS_PER_PAGE);
 
 	let prevOpen = false;
+
+	function loadFromPrefs() {
+		visibleSet = new Set($prefs.visibleApps || defaultAppIds);
+		iconStyle = $prefs.iconStyle || 'colored';
+		theme = $prefs.theme || 'auto';
+		wallpaperEnabled = $prefs.wallpaperEnabled !== false;
+		wallpaperId = $prefs.wallpaperId || null;
+		openInNewTab = $prefs.openInNewTab ?? true;
+		wallpaperPage = wallpaperId ? Math.floor((wallpaperId - 1) / WALLPAPERS_PER_PAGE) : 0;
+		enabledWidgets = new Set($prefs.enabledWidgets || ['weather', 'news', 'search']);
+	}
 	$effect(() => {
 		if (open && !prevOpen) {
 			activeTab = 'appearance';
-			visibleSet = new Set($prefs.visibleApps || defaultAppIds);
-			iconStyle = $prefs.iconStyle || 'colored';
-			theme = $prefs.theme || 'auto';
-			wallpaperEnabled = $prefs.wallpaperEnabled !== false;
-			wallpaperId = $prefs.wallpaperId || null;
-			openInNewTab = $prefs.openInNewTab ?? true;
-			wallpaperPage = wallpaperId ? Math.floor((wallpaperId - 1) / WALLPAPERS_PER_PAGE) : 0;
-			enabledWidgets = new Set($prefs.enabledWidgets || ['weather', 'news', 'search']);
+			loadFromPrefs();
 		}
 		prevOpen = open;
 	});
@@ -103,14 +107,27 @@
 		prefs.update(p => ({ ...p, wallpaperId: id }));
 	}
 
+	// Reset is appearance-only: bookmarks (customApps) and the tile layout are
+	// left alone. The button offers Undo for a few seconds afterwards.
+	const RESET_KEYS = ['visibleApps', 'iconStyle', 'theme', 'wallpaperEnabled', 'wallpaperId', 'openInNewTab'];
+	let resetUndo = $state(null);
+	let resetUndoTimer;
+
 	function resetDefaults() {
-		visibleSet = new Set(defaultAppIds);
-		iconStyle = 'colored';
-		theme = 'auto';
-		wallpaperEnabled = true;
-		wallpaperId = null;
-		openInNewTab = true;
-		prefs.update(p => ({ ...p, visibleApps: null, iconStyle: 'colored', theme: 'auto', wallpaperEnabled: true, wallpaperId: null, openInNewTab: true, customApps: [] }));
+		resetUndo = Object.fromEntries(RESET_KEYS.map((k) => [k, $prefs[k]]));
+		clearTimeout(resetUndoTimer);
+		resetUndoTimer = setTimeout(() => (resetUndo = null), 8000);
+		prefs.update(p => ({ ...p, visibleApps: null, iconStyle: 'colored', theme: 'auto', wallpaperEnabled: true, wallpaperId: null, openInNewTab: true }));
+		loadFromPrefs();
+	}
+
+	function undoResetDefaults() {
+		const snapshot = resetUndo;
+		resetUndo = null;
+		clearTimeout(resetUndoTimer);
+		if (!snapshot) return;
+		prefs.update(p => ({ ...p, ...snapshot }));
+		loadFromPrefs();
 	}
 
 	function portal(node) {
@@ -186,10 +203,17 @@
 						{/each}
 					</div>
 					<div class="mt-auto pt-3">
-						<button
-							class="text-[0.7rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono px-3"
-							onclick={resetDefaults}
-						>Reset defaults</button>
+						{#if resetUndo}
+							<button
+								class="text-[0.7rem] text-content bg-transparent border-none cursor-pointer underline underline-offset-2 font-mono px-3"
+								onclick={undoResetDefaults}
+							>Undo reset</button>
+						{:else}
+							<button
+								class="text-[0.7rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono px-3"
+								onclick={resetDefaults}
+							>Reset defaults</button>
+						{/if}
 					</div>
 				</div>
 

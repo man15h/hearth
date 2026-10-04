@@ -270,11 +270,25 @@
 		});
 	}
 
+	// Reset swaps to Undo for a few seconds rather than asking first.
+	let surfaceUndo = $state(null);
+	let surfaceUndoTimer;
+
 	function resetSurface() {
+		surfaceUndo = { widgetLayout: $prefs.widgetLayout };
+		clearTimeout(surfaceUndoTimer);
+		surfaceUndoTimer = setTimeout(() => (surfaceUndo = null), 8000);
 		prefs.update((p) => ({
 			...p,
 			widgetLayout: defaultWidgetLayout(catalog, registry, { isAdmin })
 		}));
+	}
+
+	function undoResetSurface() {
+		const snapshot = surfaceUndo;
+		surfaceUndo = null;
+		clearTimeout(surfaceUndoTimer);
+		if (snapshot) prefs.update((p) => ({ ...p, widgetLayout: snapshot.widgetLayout }));
 	}
 
 	// ── Tile context menu (right-click / long-press) — ported from AppGrid ──
@@ -676,13 +690,22 @@
 			{renderInstances.length === 1 ? 'app' : 'apps'}</span
 		>
 		<div class="surface-actions">
-			<button
-				type="button"
-				class="tray-reset"
-				onclick={resetSurface}
-				title="Reset surface to default layout"
-				aria-label="Reset surface to default layout"
-			>Reset</button>
+			{#if surfaceUndo}
+				<button
+					type="button"
+					class="tray-reset tray-undo"
+					onclick={undoResetSurface}
+					aria-label="Undo layout reset"
+				>Undo</button>
+			{:else}
+				<button
+					type="button"
+					class="tray-reset"
+					onclick={resetSurface}
+					title="Reset surface to default layout"
+					aria-label="Reset surface to default layout"
+				>Reset</button>
+			{/if}
 			<button
 				type="button"
 				class="tray-done"
@@ -1020,6 +1043,10 @@
 		cursor: pointer;
 		transition: background 180ms var(--ease-standard, ease),
 			border-color 180ms, color 180ms, opacity 180ms;
+	}
+	.tray-undo {
+		color: var(--color-content, #fafafa);
+		opacity: 1;
 	}
 	.tray-done {
 		border-color: rgba(255, 255, 255, 0.22);
