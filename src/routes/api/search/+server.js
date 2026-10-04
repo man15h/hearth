@@ -4,10 +4,12 @@ import { getAdapter } from '$lib/server/integrations/index.js';
 import { getConnection } from '$lib/server/integrations/store.js';
 import { withDeadline, describeFetchError } from '$lib/server/integrations/deadline.js';
 
-// Deadline only, not tied to request.signal: the search bar aborts on every
-// new keystroke, and a crawl that finishes anyway still fills adapter caches
-// (Planka) for the next query.
+// The response is bounded by SEARCH_TIMEOUT_MS, but the adapter's own fetches
+// get the longer UPSTREAM_TIMEOUT_MS and aren't tied to request.signal: the
+// search bar aborts on every keystroke, and a cold Planka crawl that runs past
+// the response deadline still fills the cache for the next query.
 const SEARCH_TIMEOUT_MS = 8000;
+const UPSTREAM_TIMEOUT_MS = 30000;
 
 // POST /api/search   body: { provider, query, limit? }
 //
@@ -50,15 +52,26 @@ export async function POST({ cookies, url, request, fetch }) {
 		return json({ error: 'Integration not connected' }, { status: 409 });
 	}
 
+	let timer;
 	try {
-		const result = await searchProvider.query({
+		const pending = searchProvider.query({
 			config: conn.config,
 			query,
 			limit,
-			fetch: withDeadline(fetch, SEARCH_TIMEOUT_MS)
+			fetch: withDeadline(fetch, UPSTREAM_TIMEOUT_MS)
 		});
+		pending.catch(() => {}); // may settle after we've already answered
+		const result = await Promise.race([
+			pending,
+			new Promise((_, reject) => {
+				timer = setTimeout(() => reject(new DOMException('Search timed out', 'TimeoutError')), SEARCH_TIMEOUT_MS);
+			})
+		]);
 		return json({ results: result?.results || [] });
 	} catch (err) {
-		return json({ error: `Search failed: ${describeFetchError(err, SEARCH_TIMEOUT_MS)}` }, { status: 502 });
+		const status = err?.name === 'TimeoutError' ? 504 : 502;
+		return json({ error: `Search failed: ${describeFetchError(err, SEARCH_TIMEOUT_MS)}` }, { status });
+	} finally {
+		clearTimeout(timer);
 	}
 }

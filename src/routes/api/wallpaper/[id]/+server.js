@@ -1,3 +1,5 @@
+import { fetchHeadersWithin } from '$lib/server/fetchHeaders.js';
+
 export async function GET({ params }) {
 	const id = params.id.replace(/[^0-9]/g, '').padStart(4, '0');
 	const original = `https://gitlab.com/dwt1/wallpapers/-/raw/master/${id}.jpg`;
@@ -6,8 +8,8 @@ export async function GET({ params }) {
 	// Falls back to the original if wsrv is slow or down.
 	const optimized = `https://wsrv.nl/?url=${encodeURIComponent(original)}&w=1920&we&output=webp&q=80`;
 
-	let res = await fetch(optimized, { signal: AbortSignal.timeout(8000) }).catch(() => null);
-	if (!res?.ok) res = await fetch(original, { signal: AbortSignal.timeout(15000) }).catch(() => null);
+	let res = await fetchHeadersWithin(optimized, 8000);
+	if (!res?.ok) res = await fetchHeadersWithin(original, 15000);
 	if (!res?.ok) {
 		return new Response('Not found', { status: 404 });
 	}

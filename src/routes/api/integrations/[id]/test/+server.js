@@ -36,7 +36,7 @@ export async function POST({ cookies, url, request, params, fetch }) {
 	try {
 		const result = await adapter.test({
 			config: merged,
-			fetch: withDeadline(fetch, TEST_TIMEOUT_MS, request.signal)
+			fetch: withDeadline(fetch, TEST_TIMEOUT_MS)
 		});
 		return json({
 			ok: !!result?.ok,
