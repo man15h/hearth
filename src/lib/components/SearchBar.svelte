@@ -1,5 +1,6 @@
 <script>
 	import { onMount, getContext } from 'svelte';
+	import { prefersReducedMotion } from 'svelte/motion';
 	import { integrations as integrationsStore } from '$lib/stores/integrations.js';
 	import { prefs } from '$lib/stores/prefs.js';
 	import { TOTAL_WALLPAPERS } from '$lib/wallpaper.js';
@@ -237,6 +238,15 @@
 		placeholderText = PLACEHOLDER_HINTS[0];
 
 		const step = () => {
+			// Reduced motion: swap whole hints instead of typing them out.
+			if (prefersReducedMotion.current) {
+				hintIndex = (hintIndex + 1) % PLACEHOLDER_HINTS.length;
+				charIndex = PLACEHOLDER_HINTS[hintIndex].length;
+				phase = 'holding';
+				placeholderText = PLACEHOLDER_HINTS[hintIndex];
+				timeout = setTimeout(step, 4000);
+				return;
+			}
 			const target = PLACEHOLDER_HINTS[hintIndex];
 			if (phase === 'holding') {
 				phase = 'erasing';

@@ -1,6 +1,7 @@
 <script>
 	import { dialog } from '$lib/actions/dialog.js';
 	import { onMount, untrack, getContext } from 'svelte';
+	import { prefersReducedMotion } from 'svelte/motion';
 	import { browser } from '$app/environment';
 	import { prefs } from '$lib/stores/prefs.js';
 	import { adminApps as adminAppsStore } from '$lib/stores/adminApps.js';
@@ -494,7 +495,7 @@
 				// + name line (~14) + breathing room. 92 fits cleanly.
 				cellHeight: 92,
 				float: false,
-				animate: true,
+				animate: !prefersReducedMotion.current,
 				handle: '.gs-drag-handle',
 				disableResize: true,
 				disableDrag: true,

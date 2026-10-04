@@ -1336,3 +1336,17 @@ body.search-active .hero-area {
 	box-shadow: var(--shadow-bloom);
 	border-color: var(--border-3);
 }
+
+/* Reduced motion: entrance animations, hovers and modal pops become instant.
+   JS-driven motion (typing placeholder, GridStack, AnimatedNumber)
+   checks prefersReducedMotion itself. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
