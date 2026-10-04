@@ -195,6 +195,16 @@
 	const isPaletteOpen = $derived(inlineOpen && !!(query.trim() || activeScope));
 	let debounceTimer = null;
 	let lastDispatched = '';
+	let searchAbort = null;
+
+	// Drop any pending or in-flight provider search so a slower, older
+	// response can't land under a newer query.
+	function cancelSearch() {
+		clearTimeout(debounceTimer);
+		searchAbort?.abort();
+		searchAbort = null;
+		lastDispatched = '';
+	}
 
 	// ── Rotating typed placeholder ────────────────────────────────
 	// Cycles through hints so the placeholder advertises what the palette
@@ -253,7 +263,7 @@
 		inlineOpen = false;
 	}
 
-	async function fireOneProvider(provider, q) {
+	async function fireOneProvider(provider, q, signal) {
 		providerResults = {
 			...providerResults,
 			[provider.providerId]: { ...(providerResults[provider.providerId] || {}), loading: true, error: '' }
@@ -262,7 +272,8 @@
 			const res = await fetch('/api/search', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ provider: provider.providerId, query: q, limit: 24 })
+				body: JSON.stringify({ provider: provider.providerId, query: q, limit: 24 }),
+				signal
 			});
 			if (!res.ok) {
 				const err = await res.json().catch(() => ({}));
@@ -279,7 +290,7 @@
 				}
 			};
 		} catch (err) {
-			if (lastDispatched !== q) return;
+			if (signal.aborted || lastDispatched !== q) return;
 			providerResults = {
 				...providerResults,
 				[provider.providerId]: {
@@ -301,7 +312,7 @@
 	const MIN_REMOTE_QUERY_LENGTH = 3;
 
 	function dispatchSearch(q, providers) {
-		clearTimeout(debounceTimer);
+		cancelSearch();
 		const trimmed = (q || '').trim();
 		if (trimmed.length < MIN_REMOTE_QUERY_LENGTH) {
 			providerResults = {};
@@ -309,8 +320,9 @@
 		}
 		debounceTimer = setTimeout(() => {
 			lastDispatched = trimmed;
+			searchAbort = new AbortController();
 			for (const provider of providers) {
-				fireOneProvider(provider, trimmed);
+				fireOneProvider(provider, trimmed, searchAbort.signal);
 			}
 		}, 250);
 	}
@@ -325,6 +337,7 @@
 		if (hasInlineProviders && !isBang) {
 			dispatchSearch(query, scopedProviders);
 		} else {
+			cancelSearch();
 			providerResults = {};
 		}
 	});
@@ -499,7 +512,11 @@
 	});
 </script>
 
-<div class="relative hero-search {isPaletteOpen ? 'is-open' : ''}" bind:this={containerEl} style="--results-max-h: {resultsMaxHeight}px">
+<!-- Close when keyboard focus leaves the palette (Tab-out); click-outside is
+     handled by onClickOutside. A null relatedTarget is a click on a
+     non-focusable spot, which may be inside the panel, so it's ignored. -->
+<div class="relative hero-search {isPaletteOpen ? 'is-open' : ''}" bind:this={containerEl} style="--results-max-h: {resultsMaxHeight}px"
+	onfocusout={(e) => { if (inlineOpen && e.relatedTarget && !containerEl.contains(e.relatedTarget)) inlineOpen = false; }}>
 	<form
 		class="hero-search-form flex items-center px-5 md:px-7"
 		action={searchConfig.url}
