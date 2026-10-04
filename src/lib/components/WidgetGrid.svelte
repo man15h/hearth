@@ -1036,6 +1036,22 @@
 		opacity: 1;
 		outline: none;
 	}
+	/* The pill borders and hovers above are white-alpha, invisible on the
+	   light theme; mirror them in black-alpha there. */
+	:global(.theme-light) .tray-reset,
+	:global(.theme-light) .tray-done,
+	:global(.theme-light) .edit-chip {
+		border-color: rgba(0, 0, 0, 0.14);
+	}
+	:global(.theme-light) .tray-reset:hover,
+	:global(.theme-light) .tray-reset:focus-visible,
+	:global(.theme-light) .tray-done:hover,
+	:global(.theme-light) .tray-done:focus-visible,
+	:global(.theme-light) .edit-chip:hover,
+	:global(.theme-light) .edit-chip:focus-visible {
+		background: rgba(0, 0, 0, 0.05);
+		border-color: rgba(0, 0, 0, 0.3);
+	}
 	.hero-slot {
 		min-height: 3rem;
 	}
@@ -1234,7 +1250,7 @@
 		user-select: none;
 	}
 	.app-tile-link:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--card-hover);
 	}
 	.app-tile-icon {
 		width: 44px;

@@ -209,7 +209,7 @@
 	/* Raw variables */
 	--bg: #ffffff;
 	--text: #18181b;
-	--text-muted: #52525b;
+	--text-muted: #3f3f46;
 	--text-dim: #52525b;
 	--card-bg: rgba(0, 0, 0, 0.05);
 	--card-bg-strong: rgba(0, 0, 0, 0.1);
@@ -588,6 +588,14 @@ body.search-active .dashboard-wallpaper {
 		margin-bottom: 0;
 	}
 }
+.theme-light .dashboard-header-wrap {
+	background: linear-gradient(
+		to bottom,
+		rgba(255, 255, 255, 0.8) 0%,
+		rgba(255, 255, 255, 0.55) 70%,
+		transparent 100%
+	);
+}
 .dashboard-header::before {
 	content: '';
 	position: absolute;
@@ -601,6 +609,9 @@ body.search-active .dashboard-wallpaper {
 	opacity: 0;
 	transition: opacity 200ms ease-out;
 	pointer-events: none;
+}
+.theme-light .dashboard-header::before {
+	background: linear-gradient(to bottom, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.5));
 }
 /* Only show the backdrop once the page has actually scrolled — avoids
    a muddy bar over the wallpaper at rest. Using the `:is-stuck` helper
