@@ -21,7 +21,6 @@
 	let { data } = $props();
 	let privacyOpen = $state(false);
 	let onboarded = $state(false);
-	let prefsSynced = $state(false);
 	let guideApp = $state(null);
 	let menuOpen = $state(false);
 	let manageAppsOpen = $state(false);
@@ -63,22 +62,22 @@
 		prefs.reset();
 	}
 
-	// Sync auth info into prefs on every authenticated load — wait for server state before rendering
+	// Sync auth info into prefs on every authenticated load. Server prefs come
+	// with the page data, so this is synchronous and the server-rendered
+	// dashboard stays on screen through hydration.
 	if (browser && loggedIn) {
-		(async () => {
-			prefs.update((p) => {
-				return { ...p, name: data.authName, username: data.authUsername, firstLoginAt: p.firstLoginAt || new Date().toISOString() };
-			});
-			await prefs.syncFromServer();
-			prefsSynced = true;
-			adminApps.load();
-		})();
-	} else {
-		prefsSynced = true;
+		prefs.update((p) => {
+			return { ...p, name: data.authName, username: data.authUsername, firstLoginAt: p.firstLoginAt || new Date().toISOString() };
+		});
+		if (data.prefs) prefs.applyServerPrefs(data.prefs);
+		adminApps.set(data.adminApps || []);
 	}
 
+	// Also decided at top level (not only in the effect) so the server render
+	// doesn't include the onboarding modal for users who already finished it.
+	if (!onboardingEnabled || !authEnabled || data.prefs?.onboarded) onboarded = true;
 	$effect(() => {
-		if (!onboardingEnabled || !authEnabled || (prefsSynced && $prefs.onboarded)) onboarded = true;
+		if ($prefs.onboarded) onboarded = true;
 	});
 
 	// First-login screens show one at a time: password gate, then onboarding,
@@ -166,7 +165,7 @@
 {#if authEnabled && !loggedIn}
 	<!-- Login screen (only when auth is enabled) -->
 	<OnboardingModal oncomplete={onOnboardingComplete} authName={data.authName} authUsername={data.authUsername} devMode={data.devMode} />
-{:else if showDashboard && prefsSynced}
+{:else if showDashboard}
 	<!-- Password change gate (only when auth + password_change_url configured) -->
 	{#if authEnabled}
 		<PasswordChangePrompt />
