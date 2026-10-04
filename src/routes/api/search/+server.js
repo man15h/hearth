@@ -7,7 +7,9 @@ import { withDeadline, describeFetchError } from '$lib/server/integrations/deadl
 // The response is bounded by SEARCH_TIMEOUT_MS, but the adapter's own fetches
 // get the longer UPSTREAM_TIMEOUT_MS and aren't tied to request.signal: the
 // search bar aborts on every keystroke, and a cold Planka crawl that runs past
-// the response deadline still fills the cache for the next query.
+// the response deadline still fills the cache for the next query. Other
+// adapters also run each abandoned query to the end; at a handful of users
+// that costs less than threading request.signal through every adapter.
 const SEARCH_TIMEOUT_MS = 8000;
 const UPSTREAM_TIMEOUT_MS = 30000;
 
