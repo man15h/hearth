@@ -2,6 +2,12 @@ import { json } from '@sveltejs/kit';
 import { getSessionUser } from '$lib/server/session.js';
 import { getAdapter } from '$lib/server/integrations/index.js';
 import { getConnection } from '$lib/server/integrations/store.js';
+import { withDeadline, describeFetchError } from '$lib/server/integrations/deadline.js';
+
+// Deadline only, not tied to request.signal: the search bar aborts on every
+// new keystroke, and a crawl that finishes anyway still fills adapter caches
+// (Planka) for the next query.
+const SEARCH_TIMEOUT_MS = 8000;
 
 // POST /api/search   body: { provider, query, limit? }
 //
@@ -49,10 +55,10 @@ export async function POST({ cookies, url, request, fetch }) {
 			config: conn.config,
 			query,
 			limit,
-			fetch
+			fetch: withDeadline(fetch, SEARCH_TIMEOUT_MS)
 		});
 		return json({ results: result?.results || [] });
 	} catch (err) {
-		return json({ error: `Search failed: ${err.message}` }, { status: 502 });
+		return json({ error: `Search failed: ${describeFetchError(err, SEARCH_TIMEOUT_MS)}` }, { status: 502 });
 	}
 }

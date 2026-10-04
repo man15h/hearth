@@ -3,7 +3,7 @@ export async function GET({ params }) {
 	const source = encodeURIComponent(`https://gitlab.com/dwt1/wallpapers/-/raw/master/${id}.jpg`);
 	const upstream = `https://wsrv.nl/?url=${source}&w=200&q=75`;
 
-	const res = await fetch(upstream);
+	const res = await fetch(upstream, { signal: AbortSignal.timeout(8000) });
 	if (!res.ok) {
 		return new Response('Not found', { status: 404 });
 	}
