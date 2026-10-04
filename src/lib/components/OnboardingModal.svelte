@@ -239,10 +239,12 @@
 
 {:else if step === 'onboarding'}
 	<div use:dialog={{ label: 'Welcome' }} class="fixed inset-0 bg-surface-overlay backdrop-blur-[6px] flex items-center justify-center z-[100] p-4 animate-fade-in">
-		<div class="bg-surface-modal-card backdrop-blur-[120px] border border-border-modal-card rounded-2xl w-full max-w-[480px] overflow-hidden animate-modal-enter shadow-theme">
+		<div class="bg-surface-modal-card backdrop-blur-[120px] border border-border-modal-card rounded-2xl w-full max-w-[480px] max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden animate-modal-enter shadow-theme">
 
-			<!-- Slide content -->
-			<div class="p-8 pb-0 flex flex-col overflow-x-hidden {slideHeight ? '' : 'min-h-[200px]'}" style={slideHeight ? `height: ${slideHeight}px` : ''}>
+			<!-- Slide content: one fixed height for every slide so the card doesn't
+			     jump; on short screens it shrinks and scrolls, keeping the nav bar
+			     on-screen. -->
+			<div class="p-8 pb-0 flex flex-col overflow-x-hidden min-h-0 {slideHeight ? '' : 'h-[27rem] max-md:h-[33.5rem]'}" style={slideHeight ? `height: ${slideHeight}px` : ''}>
 				{#key slide}
 				<div class="flex-1 flex flex-col items-center justify-center animate-slide-in overflow-y-auto min-h-0">
 				{#if currentSlideType() === 'welcome'}
@@ -340,7 +342,7 @@
 			</div>
 
 			<!-- Bottom bar: dots + navigation -->
-			<div class="p-6 pt-4 flex items-center justify-between">
+			<div class="p-6 pt-4 flex items-center justify-between shrink-0">
 				<!-- Dot indicators -->
 				<div class="flex gap-3">
 					{#each Array(totalSlides) as _, i}
