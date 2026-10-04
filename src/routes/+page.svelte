@@ -90,7 +90,12 @@
 	);
 
 	// Apply theme class to body
-	const theme = $derived($prefs.theme || 'auto');
+	// The prefs store is a module singleton and stays empty on the server, so
+	// the server render reads this request's prefs from page data instead;
+	// otherwise SSR picks the default theme and today's wallpaper, and the
+	// browser downloads the wrong background before hydration swaps it.
+	const viewPrefs = $derived(browser ? $prefs : data.prefs || {});
+	const theme = $derived(viewPrefs.theme || 'auto');
 	$effect(() => {
 		if (!browser) return;
 		document.body.classList.remove('theme-light', 'theme-dark');
@@ -171,11 +176,11 @@
 		<PasswordChangePrompt />
 	{/if}
 	<!-- Dashboard -->
-	{#if wallpapersEnabled && theme === 'auto' && ($prefs.wallpaperEnabled !== false)}
-		<WallpaperBackground wallpaperId={$prefs.wallpaperId || null} />
+	{#if wallpapersEnabled && theme === 'auto' && (viewPrefs.wallpaperEnabled !== false)}
+		<WallpaperBackground wallpaperId={viewPrefs.wallpaperId || null} />
 	{/if}
 <DynamicFavicon />
-	<div class="w-full max-w-[1200px] px-16 pb-16 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] max-lg:px-12 max-md:px-5 max-md:pb-[calc(6rem+env(safe-area-inset-bottom,0px))] max-md:pt-[calc(5.5rem+env(safe-area-inset-top,0px))] max-md:max-w-full max-xs:px-4 max-xs:pt-[calc(5.25rem+env(safe-area-inset-top,0px))] {$prefs.iconStyle === 'grayed' ? 'grayed-widgets' : ''} {wallpapersEnabled && theme === 'auto' && $prefs.wallpaperEnabled !== false ? 'wallpaper-active' : ''}">
+	<div class="w-full max-w-[1200px] px-16 pb-16 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] max-lg:px-12 max-md:px-5 max-md:pb-[calc(6rem+env(safe-area-inset-bottom,0px))] max-md:pt-[calc(5.5rem+env(safe-area-inset-top,0px))] max-md:max-w-full max-xs:px-4 max-xs:pt-[calc(5.25rem+env(safe-area-inset-top,0px))] {viewPrefs.iconStyle === 'grayed' ? 'grayed-widgets' : ''} {wallpapersEnabled && theme === 'auto' && viewPrefs.wallpaperEnabled !== false ? 'wallpaper-active' : ''}">
 		<div class="dashboard-header-wrap opacity-0 animate-fade-in [animation-fill-mode:both]">
 			<Header lat={$prefs.lat} lon={$prefs.lon} hasLocation={!!($prefs.lat && $prefs.lon)} showWeather={weatherEnabled} headlines={newsEnabled ? data.news : []} />
 
