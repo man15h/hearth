@@ -1,7 +1,12 @@
 import { fetchHeadersWithin } from '$lib/server/fetchHeaders.js';
+import { getTodayWallpaperId } from '$lib/wallpaper.js';
 
+// /api/wallpaper/today is the wallpaper of the day, picked in the server's
+// time zone, so other apps (e.g. a sign-in page) can show the same image as
+// the dashboard without knowing how Hearth picks it.
 export async function GET({ params }) {
-	const id = params.id.replace(/[^0-9]/g, '').padStart(4, '0');
+	const today = params.id === 'today';
+	const id = today ? getTodayWallpaperId() : params.id.replace(/[^0-9]/g, '').padStart(4, '0');
 	const original = `https://gitlab.com/dwt1/wallpapers/-/raw/master/${id}.jpg`;
 	// Re-encoded as WebP through wsrv (same as the thumb route), capped at
 	// 1920px wide and never enlarged: ~40% smaller than the source JPEGs.
@@ -17,7 +22,8 @@ export async function GET({ params }) {
 	return new Response(res.body, {
 		headers: {
 			'Content-Type': res.headers.get('Content-Type') || 'image/jpeg',
-			'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+			// "today" changes at midnight; numbered ids never change.
+			'Cache-Control': today ? 'public, max-age=3600' : 'public, max-age=604800, stale-while-revalidate=86400',
 		}
 	});
 }
