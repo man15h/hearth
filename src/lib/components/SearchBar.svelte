@@ -136,7 +136,8 @@
 
 	const ACTIONS = [
 		{ id: 'settings', bang: 'settings', label: 'Open Configure', icon: ICONS.settings, exec: () => onSettingsOpen() },
-		{ id: 'logout', bang: 'logout', label: 'Log out', icon: ICONS.logout, exec: () => { window.location.href = '/auth/logout'; } },
+		// manual: never auto-runs on the last keystroke; needs Enter or a click
+		{ id: 'logout', bang: 'logout', label: 'Log out', icon: ICONS.logout, manual: true, exec: () => { window.location.href = '/auth/logout'; } },
 		{
 			id: 'wall', bang: 'wall', label: 'Pick a random wallpaper', icon: ICONS.wall,
 			exec: () => {
@@ -211,12 +212,18 @@
 	// can do (bangs, actions, shortcuts) without a static wall of text.
 	// Pauses while the user is focused, typing, or scoped — those are
 	// states where a moving placeholder would distract.
-	const PLACEHOLDER_HINTS = [
+	// The scope hint uses a real shortcut from a connected integration, since
+	// shortcuts are per-adapter and operator-overridable.
+	const scopeHint = $derived.by(() => {
+		const it = $integrationsStore.integrations.find((i) => i.shortcut && i.userState?.connected);
+		return it ? `Try !${it.shortcut} to scope ${it.name}` : null;
+	});
+	const PLACEHOLDER_HINTS = $derived([
 		'Search apps, files, photos…',
-		'Try !nc to scope Nextcloud',
+		...(scopeHint ? [scopeHint] : []),
 		'Type !settings to configure',
 		'Press / anywhere to focus'
-	];
+	]);
 	let placeholderText = $state(PLACEHOLDER_HINTS[0]);
 
 	$effect(() => {
@@ -485,7 +492,7 @@
 		if (!m) return false;
 		const bang = m[1].toLowerCase();
 		const hits = ACTIONS.filter((a) => a.bang === bang);
-		if (!(hits.length === 1 && !hits[0].arg)) return false;
+		if (!(hits.length === 1 && !hits[0].arg && !hits[0].manual)) return false;
 		// Collision check — if another bang is a proper extension of this one, wait.
 		const hasLongerBang = ACTIONS.some((a) => a.bang !== bang && a.bang.startsWith(bang));
 		if (hasLongerBang) return false;
