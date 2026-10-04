@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { integrations as integrationsStore } from '$lib/stores/integrations.js';
 	import IntegrationCard from './IntegrationCard.svelte';
+	import { confirmDiscardUnsaved } from '$lib/unsaved.js';
 
 	let { iconStyle = 'colored' } = $props();
 
@@ -46,7 +47,7 @@
 					{integration}
 					{iconStyle}
 					expanded={expandedId === integration.id}
-					onExpandRequest={() => expandedId = integration.id}
+					onExpandRequest={() => { if (expandedId !== integration.id && !confirmDiscardUnsaved()) return; expandedId = integration.id; }}
 					onCollapseRequest={() => { if (expandedId === integration.id) expandedId = null; }}
 				/>
 			{/each}

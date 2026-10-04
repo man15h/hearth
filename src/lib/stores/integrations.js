@@ -14,6 +14,11 @@ function createIntegrationsStore() {
 	async function fetchAndSet() {
 		try {
 			const res = await fetch('/api/integrations');
+			// No session (auth disabled): there are simply no integrations.
+			if (res.status === 401) {
+				state.set({ loaded: true, loading: false, error: '', integrations: [] });
+				return;
+			}
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
 			state.set({ loaded: true, loading: false, error: '', integrations: data.integrations || [] });

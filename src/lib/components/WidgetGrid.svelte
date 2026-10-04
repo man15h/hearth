@@ -318,7 +318,12 @@
 	}
 
 	function endLongPress(e) {
-		if (longPressFired) e.preventDefault();
+		if (longPressFired) {
+			e.preventDefault();
+			// preventDefault usually suppresses the click, which would otherwise
+			// be what clears the flag; don't let it eat the next real click.
+			setTimeout(() => (longPressFired = false), 400);
+		}
 		cancelLongPress();
 	}
 

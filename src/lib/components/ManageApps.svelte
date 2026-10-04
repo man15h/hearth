@@ -6,6 +6,7 @@
 	import IntegrationsPanel from '$lib/components/IntegrationsPanel.svelte';
 	import { TOTAL_WALLPAPERS, getWallpaperThumbUrl } from '$lib/wallpaper.js';
 	import { browser } from '$app/environment';
+	import { confirmDiscardUnsaved } from '$lib/unsaved.js';
 
 	const siteConfig = getContext('config');
 	const { apps: catalogApps } = buildAppsFromConfig(siteConfig?.apps);
@@ -48,8 +49,14 @@
 	// Every close path goes through here so unsaved integration edits
 	// (marked data-unsaved by IntegrationCard) aren't dropped silently.
 	function requestClose() {
-		if (document.querySelector('[data-unsaved]') && !confirm('Discard unsaved changes?')) return;
+		if (!confirmDiscardUnsaved()) return;
 		open = false;
+	}
+
+	// Switching tabs unmounts the integrations panel, so it asks too.
+	function selectTab(id) {
+		if (id !== activeTab && !confirmDiscardUnsaved()) return;
+		activeTab = id;
 	}
 
 	// Close on Escape while the modal is open
@@ -178,7 +185,7 @@
 				] as tab}
 					<button
 						class="flex-1 min-w-fit px-2.5 py-2.5 rounded-lg border-none cursor-pointer text-center text-[0.75rem] font-medium transition-all duration-150 {activeTab === tab.id ? 'bg-surface-card-strong text-content' : 'bg-transparent text-content-dim'}"
-						onclick={() => activeTab = tab.id}
+						onclick={() => selectTab(tab.id)}
 					>{tab.label}</button>
 				{/each}
 			</div>
@@ -195,7 +202,7 @@
 						] as tab}
 							<button
 								class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg border-none cursor-pointer transition-all duration-150 text-left {activeTab === tab.id ? 'bg-surface-card-strong' : 'bg-transparent hover:bg-surface-card-hover'}"
-								onclick={() => activeTab = tab.id}
+								onclick={() => selectTab(tab.id)}
 							>
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0 {activeTab === tab.id ? 'text-content' : 'text-content-dim'}">{@html tab.svg}</svg>
 								<span class="text-[0.78rem] font-medium {activeTab === tab.id ? 'text-content' : 'text-content-dim'}">{tab.label}</span>
