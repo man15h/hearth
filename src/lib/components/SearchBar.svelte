@@ -218,13 +218,14 @@
 		const it = $integrationsStore.integrations.find((i) => i.shortcut && i.userState?.connected);
 		return it ? `Try !${it.shortcut} to scope ${it.name}` : null;
 	});
+	const FIRST_HINT = 'Search apps, files, photos…';
 	const PLACEHOLDER_HINTS = $derived([
-		'Search apps, files, photos…',
+		FIRST_HINT,
 		...(scopeHint ? [scopeHint] : []),
 		'Type !settings to configure',
 		'Press / anywhere to focus'
 	]);
-	let placeholderText = $state(PLACEHOLDER_HINTS[0]);
+	let placeholderText = $state(FIRST_HINT);
 
 	$effect(() => {
 		if (typeof document === 'undefined') return;
