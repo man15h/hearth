@@ -124,13 +124,13 @@
 		return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-content-muted">$1</strong>');
 	}
 
-	// Resolve icon string to a CDN URL
+	// Resolve icon string to an icon URL
 	// Supports: "lucide:icon-name", direct URLs, or bare names (treated as lucide)
 	function resolveSlideIcon(icon) {
 		if (!icon) return null;
 		if (icon.startsWith('http')) return icon;
-		if (icon.startsWith('lucide:')) return `https://cdn.jsdelivr.net/npm/lucide-static/icons/${icon.slice(7)}.svg`;
-		return `https://cdn.jsdelivr.net/npm/lucide-static/icons/${icon}.svg`;
+		if (icon.startsWith('lucide:')) return `/api/icon/lucide/${icon.slice(7)}`;
+		return `/api/icon/lucide/${icon}`;
 	}
 
 

@@ -86,7 +86,7 @@ branding:
   favicon: "/icons/favicon.svg"
   font:
     family: "JetBrains Mono"
-    url: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    url: null   # JetBrains Mono is bundled; set a stylesheet URL only for another font
   theme_color: "#09090b"
 ```
 

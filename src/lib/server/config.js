@@ -48,7 +48,7 @@ function loadConfig() {
 
 function getDefaults() {
 	return {
-		branding: { name: 'Hearth', short_name: 'hearth', description: 'Self-hosted dashboard', logo: null, favicon: null, font: { family: 'JetBrains Mono', url: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap' }, theme_color: '#09090b', accent_color: '#f5b942', show_footer: true },
+		branding: { name: 'Hearth', short_name: 'hearth', description: 'Self-hosted dashboard', logo: null, favicon: null, font: { family: 'JetBrains Mono', url: null }, theme_color: '#09090b', accent_color: '#f5b942', show_footer: true },
 		auth: { enabled: false, oidc: {}, admin_usernames: [], password_change_url: null, registration: { enabled: false, url: null } },
 		apps: [],
 		customization: { enabled: false },
