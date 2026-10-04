@@ -360,6 +360,15 @@ body {
 	border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
+/* Modal cards sit over the white hero search bar, which showed through the
+   6%-white glass and washed out modal text. Give them an opaque-ish base. */
+[role='dialog'] .glass-card {
+	background: rgba(24, 24, 27, 0.82);
+}
+.theme-light [role='dialog'] .glass-card {
+	background: rgba(255, 255, 255, 0.78);
+}
+
 /* Category card — border-only fieldset with centered legend */
 .category-card {
 	border: 1px solid var(--divider);
