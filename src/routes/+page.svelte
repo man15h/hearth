@@ -208,6 +208,6 @@
 
 	<!-- Post-login onboarding (only when auth + onboarding enabled) -->
 	{#if authEnabled && onboardingEnabled && !onboarded && !passwordGate}
-		<OnboardingModal oncomplete={onOnboardingComplete} authName={data.authName} authUsername={data.authUsername} devMode={data.devMode} />
+		<OnboardingModal oncomplete={onOnboardingComplete} authName={data.authName} authUsername={data.authUsername} devMode={data.devMode} isAdmin={data.isAdmin} />
 	{/if}
 {/if}

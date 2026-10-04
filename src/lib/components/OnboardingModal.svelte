@@ -19,7 +19,7 @@
 	const privacyConfig = siteConfig?.privacy || {};
 	const privacyHtml = privacyConfig.html || null;
 
-	let { oncomplete, authName = null, authUsername = null, devMode = false } = $props();
+	let { oncomplete, authName = null, authUsername = null, devMode = false, isAdmin = false } = $props();
 
 	let step = $state(authName ? 'onboarding' : 'welcome');
 	let slide = $state(0);
@@ -104,7 +104,7 @@
 		? serviceConfig
 			.map(s => {
 				const app = allApps.find(a => a.id === s.id);
-				if (!app) return null;
+				if (!app || (app.admin_only && !isAdmin)) return null;
 				return {
 					name: app.name,
 					desc: s.desc || app.setup_guide?.subtitle || '',
