@@ -25,12 +25,6 @@
 	let guideApp = $state(null);
 	let menuOpen = $state(false);
 	let manageAppsOpen = $state(false);
-	let manageAppsTab = $state('appearance');
-
-	function openManageApps(tab = 'appearance') {
-		manageAppsTab = tab;
-		manageAppsOpen = true;
-	}
 	let editMode = $state(false);
 
 	import { buildAppsFromConfig } from '$lib/apps.js';
@@ -111,8 +105,8 @@
 	});
 
 
-	// Weather shows only for a location the user chose (Configure > Widgets >
-	// Weather, or onboarding). When that choice is "my device", keep it
+	// Weather shows only for a location the user chose from the weather
+	// menu in the header. When that choice is "my device", keep it
 	// current: refresh on load and whenever the browser permission flips to
 	// granted, and drop the coordinates if the permission is revoked so the
 	// widget hides instead of showing a stale place. Manually chosen places
@@ -193,11 +187,11 @@
 <DynamicFavicon />
 	<div class="w-full max-w-[1200px] px-16 pb-16 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] max-lg:px-12 max-md:px-5 max-md:pb-[calc(6rem+env(safe-area-inset-bottom,0px))] max-md:pt-[calc(5.5rem+env(safe-area-inset-top,0px))] max-md:max-w-full max-xs:px-4 max-xs:pt-[calc(5.25rem+env(safe-area-inset-top,0px))] {viewPrefs.iconStyle === 'grayed' ? 'grayed-widgets' : ''} {wallpapersEnabled && theme === 'auto' && viewPrefs.wallpaperEnabled !== false ? 'wallpaper-active' : ''}">
 		<div class="dashboard-header-wrap opacity-0 animate-fade-in [animation-fill-mode:both]">
-			<Header lat={$prefs.lat} lon={$prefs.lon} placeName={$prefs.locationSource === 'manual' ? $prefs.locationName : ''} showWeather={weatherEnabled} headlines={newsEnabled ? data.news : []} onweatherclick={customizationEnabled ? () => openManageApps('widgets') : null} />
+			<Header lat={$prefs.lat} lon={$prefs.lon} placeName={$prefs.locationSource === 'manual' ? $prefs.locationName : ''} locationSource={$prefs.locationSource} showWeather={weatherEnabled} headlines={newsEnabled ? data.news : []} />
 
 		</div>
 		<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:75ms] relative z-20">
-			<WidgetGrid isAdmin={data.isAdmin} bind:guideApp bind:editMode {searchEnabled} {customizationEnabled} onSettingsOpen={() => openManageApps()} />
+			<WidgetGrid isAdmin={data.isAdmin} bind:guideApp bind:editMode {searchEnabled} {customizationEnabled} onSettingsOpen={() => manageAppsOpen = true} />
 		</div>
 		<!-- Inline help tips disabled for now — revisit once the palette
 		     layout is settled and we decide where tips fit in. -->
@@ -215,9 +209,9 @@
 	{#if privacyEnabled}
 		<PrivacyTerms bind:open={privacyOpen} standalone />
 	{/if}
-	<SettingsButton bind:open={menuOpen} onmanageapps={customizationEnabled ? () => openManageApps() : null} showAuth={authEnabled} />
+	<SettingsButton bind:open={menuOpen} onmanageapps={customizationEnabled ? () => manageAppsOpen = true : null} showAuth={authEnabled} />
 	{#if customizationEnabled}
-		<ManageApps bind:open={manageAppsOpen} isAdmin={data.isAdmin} initialTab={manageAppsTab} />
+		<ManageApps bind:open={manageAppsOpen} isAdmin={data.isAdmin} />
 	{/if}
 	<InstallPrompt devMode={data.devMode} ready={onboarded && !passwordGate} />
 

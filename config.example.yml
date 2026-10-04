@@ -238,7 +238,7 @@ wallpapers:
 
 # ── Weather Widget ──────────────────────────────────────────
 weather:
-  enabled: true                               # Shown once a user sets a location (Configure → Widgets → Weather)
+  enabled: true                               # Users set their location from the weather pill
 
 # ── Onboarding ──────────────────────────────────────────────
 onboarding:
@@ -275,7 +275,6 @@ onboarding:
     #       desc: "Contact admin if something breaks"
     #       icon: alert-circle                # Per-item icon override
     #   footer: "Thanks for being part of the community"
-    - type: weather                           # Built-in: location permission prompt
 
 # ── Privacy Policy ──────────────────────────────────────────
 # Option A: Use a markdown file (recommended)

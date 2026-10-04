@@ -360,12 +360,15 @@ body {
 	border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-/* Modal cards sit over the white hero search bar, which showed through the
-   6%-white glass and washed out modal text. Give them an opaque-ish base. */
-[role='dialog'] .glass-card {
+/* Modal cards and popovers (the weather menu) sit over the white hero search
+   bar, which showed through the 6%-white glass and washed out their text.
+   Give them an opaque-ish base. */
+[role='dialog'] .glass-card,
+.glass-card[role='dialog'] {
 	background: rgba(24, 24, 27, 0.82);
 }
-.theme-light [role='dialog'] .glass-card {
+.theme-light [role='dialog'] .glass-card,
+.theme-light .glass-card[role='dialog'] {
 	background: rgba(255, 255, 255, 0.78);
 }
 
@@ -574,6 +577,11 @@ body.search-active .dashboard-wallpaper {
    tile row doesn't slide under it. */
 .dashboard-header {
 	min-height: 36px;
+}
+/* Above the search bar, so the weather menu drops down over it */
+.dashboard-header-wrap {
+	position: relative;
+	z-index: 30;
 }
 @media (max-width: 767px) {
 	.dashboard-header-wrap {

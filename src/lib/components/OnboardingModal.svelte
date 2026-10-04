@@ -75,20 +75,6 @@
 		oncomplete();
 	}
 
-	function allowLocation() {
-		navigator.geolocation.getCurrentPosition(
-			(pos) => {
-				prefs.update((p) => ({
-					...p,
-					lat: pos.coords.latitude,
-					lon: pos.coords.longitude,
-					locationSource: 'device'
-				}));
-				finish();
-			},
-			() => finish()
-		);
-	}
 
 	// Lock body scroll when any modal step is active
 	$effect(() => {
@@ -163,7 +149,10 @@
 
 	// Build slides from config — merge with type defaults for list-based slides
 	const listTypes = new Set(['privacy', 'security', 'list']);
-	const configSlides = onboardingConfig.slides || [{ type: 'welcome' }, { type: 'services' }, { type: 'weather' }];
+	// The old 'weather' slide asked for location up front; the location is
+	// now set from the weather pill itself, so the type is skipped even when
+	// an existing config still lists it.
+	const configSlides = (onboardingConfig.slides || [{ type: 'welcome' }, { type: 'services' }]).filter(s => s.type !== 'weather');
 	const slides = configSlides.map(s => {
 		if (listTypes.has(s.type)) {
 			const defaults = slideDefaults[s.type] || {};
@@ -313,30 +302,6 @@
 						{/if}
 					</div>
 
-				{:else if currentSlideType() === 'weather'}
-					<div class="flex flex-col w-full">
-						<div class="flex items-center justify-center mb-4">
-							<svg viewBox="0 0 24 24" class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="12" cy="12" r="4" class="text-content-muted"/>
-								<path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" class="text-content-dim"/>
-							</svg>
-						</div>
-						<h2 class="text-[1.2rem] font-semibold mb-1 text-center">Local Weather</h2>
-						<p class="text-content-dim text-[0.75rem] mb-5 text-center">Optional — stays on your device</p>
-						<p class="text-content-muted text-[0.8rem] leading-relaxed text-center px-4 mb-6">
-							Allow location access to show weather on your dashboard.
-						</p>
-						<div class="flex flex-col items-center gap-2 mt-auto">
-							<button
-								class="w-full max-w-[280px] py-3 px-4 border-none rounded-[10px] text-[0.85rem] font-medium font-mono cursor-pointer transition-[opacity,background] duration-200 bg-surface-card-strong text-content border border-border-card hover:bg-surface-card-strong"
-								onclick={allowLocation}
-							>Allow Location</button>
-							<button
-								class="text-[0.75rem] text-content-dim bg-transparent border-none cursor-pointer hover:text-content transition-colors font-mono"
-								onclick={finish}
-							>Skip, I'll set it later</button>
-						</div>
-					</div>
 				{/if}
 				</div>
 				{/key}
@@ -362,7 +327,7 @@
 						disabled={slide === 0}
 						onclick={back}
 					>Back</button>
-					{#if slide === totalSlides - 1 && currentSlideType() !== 'weather'}
+					{#if slide === totalSlides - 1}
 					<button
 						class="py-2 px-5 rounded-lg text-[0.8rem] font-mono cursor-pointer transition-colors duration-150 login-btn"
 						onclick={finish}

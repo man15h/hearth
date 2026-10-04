@@ -170,7 +170,7 @@ Direct URLs also work: `"https://cdn.example.com/icon.svg"`.
 
 ### Onboarding
 
-Onboarding uses a composable `slides` array. Each slide has a `type` — built-in types (`welcome`, `services`, `weather`) have special behavior, while `privacy`, `security`, and `list` all render through a generic list engine with per-type defaults.
+Onboarding uses a composable `slides` array. Each slide has a `type` — built-in types (`welcome`, `services`) have special behavior, while `privacy`, `security`, and `list` all render through a generic list engine with per-type defaults.
 
 ```yaml
 onboarding:
@@ -195,7 +195,6 @@ onboarding:
           desc: "Contact the admin if something breaks"
           icon: alert-circle                           # per-item icon override
       footer: "Thanks for being here"
-    - type: weather                        # location permission prompt
 ```
 
 All list-based types (`privacy`, `security`, `list`) support: `icon`, `title`, `subtitle`, `items`, `footer`, `list_icon`. Items auto-detect format: `{text}` renders with bold markdown, `{title, desc}` renders as **title** — desc. Both formats can coexist in one slide.
@@ -236,7 +235,7 @@ wallpapers:
   enabled: true
 
 weather:
-  enabled: true                # shown once a user sets a location (Configure → Widgets)
+  enabled: true                # users set their location from the weather pill
 
 tips:
   enabled: true
