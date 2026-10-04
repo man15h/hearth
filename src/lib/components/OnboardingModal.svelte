@@ -81,7 +81,8 @@
 				prefs.update((p) => ({
 					...p,
 					lat: pos.coords.latitude,
-					lon: pos.coords.longitude
+					lon: pos.coords.longitude,
+					locationSource: 'device'
 				}));
 				finish();
 			},

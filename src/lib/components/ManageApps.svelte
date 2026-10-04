@@ -4,6 +4,7 @@
 	import { prefs } from '$lib/stores/prefs.js';
 	import { buildAppsFromConfig } from '$lib/apps.js';
 	import IntegrationsPanel from '$lib/components/IntegrationsPanel.svelte';
+	import WeatherLocation from '$lib/components/WeatherLocation.svelte';
 	import { TOTAL_WALLPAPERS, getWallpaperThumbUrl } from '$lib/wallpaper.js';
 	import { browser } from '$app/environment';
 	import { confirmDiscardUnsaved } from '$lib/unsaved.js';
@@ -12,7 +13,7 @@
 	const { apps: catalogApps } = buildAppsFromConfig(siteConfig?.apps);
 	const defaultAppIds = catalogApps.filter((a) => a.default !== false).map((a) => a.id);
 
-	let { open = $bindable(false), isAdmin = false } = $props();
+	let { open = $bindable(false), isAdmin = false, initialTab = 'appearance' } = $props();
 
 	let activeTab = $state('appearance');
 	let visibleSet = $state(new Set($prefs.visibleApps || defaultAppIds));
@@ -40,7 +41,7 @@
 	}
 	$effect(() => {
 		if (open && !prevOpen) {
-			activeTab = 'appearance';
+			activeTab = initialTab;
 			loadFromPrefs();
 		}
 		prevOpen = open;
@@ -356,6 +357,9 @@
 							<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {enabledWidgets.has(widget.id) ? 'translate-x-4' : 'translate-x-0.5'}"></div>
 						</div>
 					</button>
+					{#if widget.id === 'weather' && enabledWidgets.has('weather')}
+						<WeatherLocation />
+					{/if}
 				{/each}
 
 				{:else if activeTab === 'integrations'}

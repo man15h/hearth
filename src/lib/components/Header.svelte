@@ -1,16 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { getContext } from 'svelte';
 	import Weather from './Weather.svelte';
 	import NewsPill from './NewsPill.svelte';
-	import { DAYS, MONTHS, WEATHER_TTL, FALLBACK_LAT, FALLBACK_LON, WEATHER_MAP } from '$lib/constants.js';
-	let { lat, lon, hasLocation, showWeather = true, headlines = [] } = $props();
-
-	const siteConfig = getContext('config');
-	const weatherConfig = siteConfig?.weather || {};
-	const defaultLat = weatherConfig.default_lat || FALLBACK_LAT;
-	const defaultLon = weatherConfig.default_lon || FALLBACK_LON;
+	import { DAYS, MONTHS, WEATHER_TTL } from '$lib/constants.js';
+	// No lat/lon means the user hasn't chosen a location: weather stays hidden.
+	// placeName is set for a manually chosen place, which needs no reverse lookup.
+	let { lat, lon, placeName = '', showWeather = true, headlines = [], onweatherclick = null } = $props();
 
 	let weatherData = $state(null);
 	let locationName = $state('');
@@ -79,12 +75,14 @@
 	}
 
 	$effect(() => {
-		if (!showWeather) return;
-		const useLat = lat || defaultLat;
-		const useLon = lon || defaultLon;
-
-		fetchWeather(useLat, useLon).then(d => { weatherData = d; });
-		fetchLocation(useLat, useLon).then(n => { locationName = n; });
+		weatherData = null;
+		locationName = '';
+		if (!showWeather || !lat || !lon) return;
+		let stale = false;
+		fetchWeather(lat, lon).then(d => { if (!stale) weatherData = d; });
+		if (placeName) locationName = placeName;
+		else fetchLocation(lat, lon).then(n => { if (!stale) locationName = n; });
+		return () => { stale = true; };
 	});
 
 	let headerEl;
@@ -112,6 +110,6 @@
 	</div>
 	<div class="flex items-center gap-3 shrink-0">
 		{#if headlines.length > 0}<NewsPill {headlines} />{/if}
-		{#if showWeather}<Weather {weatherData} {locationName} />{/if}
+		{#if showWeather && lat && lon}<Weather {weatherData} {locationName} onclick={onweatherclick} />{/if}
 	</div>
 </div>

@@ -177,7 +177,7 @@ export async function getClientConfig({ authenticated = true } = {}) {
 		news: { enabled: config.news?.enabled ?? false },
 		search: getSearchConfig(),
 		wallpapers: { enabled: config.wallpapers?.enabled ?? false },
-		weather: { enabled: config.weather?.enabled ?? false, default_lat: config.weather?.default_lat, default_lon: config.weather?.default_lon },
+		weather: { enabled: config.weather?.enabled ?? false },
 		onboarding: getOnboardingConfig(),
 		privacy: { ...getPrivacyConfig(), html: await loadPrivacyHtml(config) },
 		tips: getTipsConfig()

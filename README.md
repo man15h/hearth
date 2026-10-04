@@ -236,9 +236,7 @@ wallpapers:
   enabled: true
 
 weather:
-  enabled: true
-  default_lat: 40.7128
-  default_lon: -74.0060
+  enabled: true                # shown once a user sets a location (Configure → Widgets)
 
 tips:
   enabled: true

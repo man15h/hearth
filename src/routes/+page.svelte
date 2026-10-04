@@ -17,6 +17,7 @@
 	import PasswordChangePrompt from '$lib/components/PasswordChangePrompt.svelte';
 
 	import { browser } from '$app/environment';
+	import { get } from 'svelte/store';
 
 	let { data } = $props();
 	let privacyOpen = $state(false);
@@ -24,6 +25,12 @@
 	let guideApp = $state(null);
 	let menuOpen = $state(false);
 	let manageAppsOpen = $state(false);
+	let manageAppsTab = $state('appearance');
+
+	function openManageApps(tab = 'appearance') {
+		manageAppsTab = tab;
+		manageAppsOpen = true;
+	}
 	let editMode = $state(false);
 
 	import { buildAppsFromConfig } from '$lib/apps.js';
@@ -104,12 +111,17 @@
 	});
 
 
-	// Silently refresh geolocation on load AND whenever the geolocation
-	// permission flips to 'granted' (e.g. user enabled it via browser
-	// settings after onboarding). Without the Permissions API listener,
-	// granting access outside our UI required a page reload to take effect.
+	// Weather shows only for a location the user chose (Configure > Widgets >
+	// Weather, or onboarding). When that choice is "my device", keep it
+	// current: refresh on load and whenever the browser permission flips to
+	// granted, and drop the coordinates if the permission is revoked so the
+	// widget hides instead of showing a stale place. Manually chosen places
+	// are never overwritten.
+	const followDevice = $derived(
+		weatherEnabled && !!($prefs.lat && $prefs.lon) && $prefs.locationSource !== 'manual'
+	);
 	$effect(() => {
-		if (!browser || !weatherEnabled) return;
+		if (!browser || !followDevice) return;
 		let permStatus = null;
 		let cancelled = false;
 
@@ -117,15 +129,13 @@
 			navigator.geolocation?.getCurrentPosition(
 				(pos) => {
 					if (cancelled) return;
-					const curLat = $prefs.lat;
-					const curLon = $prefs.lon;
-					const dlat = curLat ? Math.abs(pos.coords.latitude - curLat) : Infinity;
-					const dlon = curLon ? Math.abs(pos.coords.longitude - curLon) : Infinity;
-					if (!curLat || !curLon || dlat > 0.1 || dlon > 0.1) {
+					const cur = get(prefs);
+					if (Math.abs(pos.coords.latitude - cur.lat) > 0.01 || Math.abs(pos.coords.longitude - cur.lon) > 0.01) {
 						prefs.update((p) => ({
 							...p,
 							lat: pos.coords.latitude,
-							lon: pos.coords.longitude
+							lon: pos.coords.longitude,
+							locationSource: 'device'
 						}));
 					}
 				},
@@ -133,9 +143,15 @@
 			);
 		}
 
-		function onPermChange() {
-			if (permStatus?.state === 'granted') fetchAndStore();
+		function forgetLocation() {
+			prefs.update((p) => ({ ...p, lat: null, lon: null, locationSource: null, locationName: null }));
 		}
+
+		function onPermState(state) {
+			if (state === 'granted') fetchAndStore();
+			else if (state === 'denied') forgetLocation();
+		}
+		const onPermChange = () => onPermState(permStatus?.state);
 
 		if (navigator.permissions?.query) {
 			navigator.permissions
@@ -143,16 +159,11 @@
 				.then((status) => {
 					if (cancelled) return;
 					permStatus = status;
-					if (status.state === 'granted') fetchAndStore();
+					onPermState(status.state);
 					status.addEventListener('change', onPermChange);
 				})
-				.catch(() => {
-					// Permissions API rejected the descriptor — fall back to the
-					// pre-existing behavior (only refresh if we already have
-					// coords, i.e. user opted in during onboarding).
-					if ($prefs.lat && $prefs.lon) fetchAndStore();
-				});
-		} else if ($prefs.lat && $prefs.lon) {
+				.catch(fetchAndStore);
+		} else {
 			fetchAndStore();
 		}
 
@@ -182,11 +193,11 @@
 <DynamicFavicon />
 	<div class="w-full max-w-[1200px] px-16 pb-16 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] max-lg:px-12 max-md:px-5 max-md:pb-[calc(6rem+env(safe-area-inset-bottom,0px))] max-md:pt-[calc(5.5rem+env(safe-area-inset-top,0px))] max-md:max-w-full max-xs:px-4 max-xs:pt-[calc(5.25rem+env(safe-area-inset-top,0px))] {viewPrefs.iconStyle === 'grayed' ? 'grayed-widgets' : ''} {wallpapersEnabled && theme === 'auto' && viewPrefs.wallpaperEnabled !== false ? 'wallpaper-active' : ''}">
 		<div class="dashboard-header-wrap opacity-0 animate-fade-in [animation-fill-mode:both]">
-			<Header lat={$prefs.lat} lon={$prefs.lon} hasLocation={!!($prefs.lat && $prefs.lon)} showWeather={weatherEnabled} headlines={newsEnabled ? data.news : []} />
+			<Header lat={$prefs.lat} lon={$prefs.lon} placeName={$prefs.locationSource === 'manual' ? $prefs.locationName : ''} showWeather={weatherEnabled} headlines={newsEnabled ? data.news : []} onweatherclick={customizationEnabled ? () => openManageApps('widgets') : null} />
 
 		</div>
 		<div class="opacity-0 animate-fade-in-up [animation-fill-mode:both] [animation-delay:75ms] relative z-20">
-			<WidgetGrid isAdmin={data.isAdmin} bind:guideApp bind:editMode {searchEnabled} {customizationEnabled} onSettingsOpen={() => manageAppsOpen = true} />
+			<WidgetGrid isAdmin={data.isAdmin} bind:guideApp bind:editMode {searchEnabled} {customizationEnabled} onSettingsOpen={() => openManageApps()} />
 		</div>
 		<!-- Inline help tips disabled for now — revisit once the palette
 		     layout is settled and we decide where tips fit in. -->
@@ -204,9 +215,9 @@
 	{#if privacyEnabled}
 		<PrivacyTerms bind:open={privacyOpen} standalone />
 	{/if}
-	<SettingsButton bind:open={menuOpen} onmanageapps={customizationEnabled ? () => manageAppsOpen = true : null} showAuth={authEnabled} />
+	<SettingsButton bind:open={menuOpen} onmanageapps={customizationEnabled ? () => openManageApps() : null} showAuth={authEnabled} />
 	{#if customizationEnabled}
-		<ManageApps bind:open={manageAppsOpen} isAdmin={data.isAdmin} />
+		<ManageApps bind:open={manageAppsOpen} isAdmin={data.isAdmin} initialTab={manageAppsTab} />
 	{/if}
 	<InstallPrompt devMode={data.devMode} ready={onboarded && !passwordGate} />
 
