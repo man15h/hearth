@@ -81,6 +81,15 @@
 		if (!onboardingEnabled || !authEnabled || (prefsSynced && $prefs.onboarded)) onboarded = true;
 	});
 
+	// First-login screens show one at a time: password gate, then onboarding,
+	// then the install bar. Mirrors PasswordChangePrompt's own `blocked` check.
+	const passwordGate = $derived(
+		authEnabled &&
+		!!siteConfig?.auth?.password_change_url &&
+		!$prefs.passwordVerified &&
+		!!$prefs.firstLoginAt
+	);
+
 	// Apply theme class to body
 	const theme = $derived($prefs.theme || 'auto');
 	$effect(() => {
@@ -195,10 +204,10 @@
 	{#if customizationEnabled}
 		<ManageApps bind:open={manageAppsOpen} isAdmin={data.isAdmin} />
 	{/if}
-	<InstallPrompt devMode={data.devMode} />
+	<InstallPrompt devMode={data.devMode} ready={onboarded && !passwordGate} />
 
 	<!-- Post-login onboarding (only when auth + onboarding enabled) -->
-	{#if authEnabled && onboardingEnabled && !onboarded}
+	{#if authEnabled && onboardingEnabled && !onboarded && !passwordGate}
 		<OnboardingModal oncomplete={onOnboardingComplete} authName={data.authName} authUsername={data.authUsername} devMode={data.devMode} />
 	{/if}
 {/if}
