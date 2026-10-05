@@ -6,10 +6,14 @@
 
 	// Until a location is chosen the pill reads "Set location", and its first
 	// click asks the browser. source: 'device' | 'manual'.
-	let { weatherData, locationName, hasLocation = false, source } = $props();
+	// weatherLoaded: the forecast request has settled (weatherData may still be
+	// null if it failed) — the pill stays so the menu stays reachable.
+	let { weatherData, weatherLoaded = false, locationName, hasLocation = false, source } = $props();
 
 	let open = $state(false);
 	let rootEl = $state();
+	let pillEl = $state();
+	let menuEl = $state();
 	let query = $state('');
 	let results = $state([]);
 	let status = $state('');
@@ -21,6 +25,13 @@
 	const laterInfo = $derived(
 		weatherData?.later ? (WEATHER_MAP[weatherData.later.code] || [null, 'Unknown']) : null
 	);
+	// The "later" forecast is a fixed few hours ahead; in the evening that
+	// lands after midnight, where "later today" would be wrong.
+	const laterWhen = $derived.by(() => {
+		if (!weatherData?.later) return '';
+		const at = new Date(Date.now() + (weatherData.later.hours ?? 6) * 3600e3);
+		return at.getDate() === new Date().getDate() ? 'later today' : 'overnight';
+	});
 	const sourceLabel = $derived(
 		source === 'manual' ? 'Address you set' : 'From your device location'
 	);
@@ -91,7 +102,13 @@
 	$effect(() => {
 		if (!open) return;
 		const onDown = (e) => { if (!rootEl?.contains(e.target)) close(); };
-		const onKey = (e) => { if (e.key === 'Escape') close(); };
+		const onKey = (e) => {
+			if (e.key !== 'Escape') return;
+			close();
+			pillEl?.focus();
+		};
+		// Move focus into the panel so keyboard users land on its first action.
+		queueMicrotask(() => menuEl?.querySelector('button:not([disabled]), input')?.focus());
 		document.addEventListener('pointerdown', onDown);
 		document.addEventListener('keydown', onKey);
 		return () => {
@@ -101,11 +118,12 @@
 	});
 </script>
 
-{#if !hasLocation || weatherInfo}
+{#if !hasLocation || weatherInfo || weatherLoaded}
 	<div class="relative shrink-0" bind:this={rootEl}>
 		<button
+			bind:this={pillEl}
 			class="animate-fade-in flex items-center gap-1.5 text-[0.85rem] max-md:text-[0.75rem] tracking-[0.12em] uppercase text-content font-mono bg-transparent border-none p-0 cursor-pointer hover:opacity-80"
-			aria-haspopup="true"
+			aria-haspopup="dialog"
 			aria-expanded={open}
 			title="Weather and location"
 			onclick={toggle}
@@ -121,20 +139,21 @@
 				{/if}
 			{:else}
 				<svg class="w-3.5 h-3.5 shrink-0 opacity-85" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
-				<span class="text-content-muted">Set location</span>
+				<span class="text-content-muted">{hasLocation ? locationName || 'Weather unavailable' : 'Set location'}</span>
 			{/if}
 		</button>
 
 		{#if open}
 			<div
 				class="weather-menu absolute right-0 top-full mt-2 z-[70] w-[18rem] max-w-[calc(100vw-2rem)] glass-card rounded-xl shadow-theme animate-menu-up normal-case tracking-normal text-[0.78rem] font-mono text-content overflow-hidden"
+				bind:this={menuEl}
 				role="dialog"
 				aria-label="Weather and location"
 			>
 				{#if hasLocation && laterInfo}
 					<div class="flex items-center gap-2.5 px-4 py-3">
 						<span class="w-4 h-4 shrink-0 text-content-muted">{@html laterInfo[0]}</span>
-						<span><span class="tabular-nums">{weatherData.later.temp}&deg;</span> {laterInfo[1].toLowerCase()} later today</span>
+						<span><span class="tabular-nums">{weatherData.later.temp}&deg;</span> {laterInfo[1].toLowerCase()} {laterWhen}</span>
 					</div>
 				{/if}
 				{#if hasLocation}

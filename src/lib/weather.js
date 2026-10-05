@@ -27,6 +27,7 @@ export async function fetchWeather(lat, lon) {
 			temp: Math.round(d.current.temperature_2m),
 			code: d.current.weather_code,
 			later: {
+				hours: LATER_HOURS,
 				temp: Math.round(d.hourly.temperature_2m[LATER_HOURS]),
 				code: d.hourly.weather_code[LATER_HOURS]
 			}

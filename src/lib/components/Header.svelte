@@ -11,6 +11,7 @@
 	let { lat, lon, placeName = '', locationSource = null, showWeather = true, headlines = [] } = $props();
 
 	let weatherData = $state(null);
+	let weatherLoaded = $state(false);
 	let locationName = $state('');
 	let now = $state(new Date());
 
@@ -30,12 +31,13 @@
 
 	$effect(() => {
 		weatherData = null;
+		weatherLoaded = false;
 		locationName = '';
 		if (!browser || !showWeather || !(lat && lon)) return;
 		let stale = false;
 		if (placeName) locationName = placeName;
 		else reverseGeocode(lat, lon).then((n) => { if (!stale) locationName = n; });
-		fetchWeather(lat, lon).then((d) => { if (!stale) weatherData = d; });
+		fetchWeather(lat, lon).then((d) => { if (!stale) { weatherData = d; weatherLoaded = true; } });
 		return () => { stale = true; };
 	});
 
@@ -64,6 +66,6 @@
 	</div>
 	<div class="flex items-center gap-3 shrink-0">
 		{#if headlines.length > 0}<NewsPill {headlines} />{/if}
-		{#if showWeather}<Weather {weatherData} {locationName} hasLocation={!!(lat && lon)} source={locationSource === 'manual' ? 'manual' : 'device'} />{/if}
+		{#if showWeather}<Weather {weatherData} {weatherLoaded} {locationName} hasLocation={!!(lat && lon)} source={locationSource === 'manual' ? 'manual' : 'device'} />{/if}
 	</div>
 </div>
