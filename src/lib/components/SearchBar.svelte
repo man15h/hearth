@@ -20,11 +20,24 @@
 	// bottom edge to the viewport bottom minus a breathing gap. Recomputed on
 	// open + window resize so the panel never spills past the visible area.
 	let resultsMaxHeight = $state(420);
+	// On desktop the open palette slides up toward the top of the viewport,
+	// Spotlight-style, so short screens (a 14" laptop) give the results most
+	// of the height instead of the strip under a mid-page bar. Phones keep
+	// the bottom dock. `lift` is the px the bar is raised by.
+	let lift = $state(0);
 	function recomputeResultsMaxHeight() {
 		if (!containerEl || typeof window === 'undefined') return;
 		const rect = containerEl.getBoundingClientRect();
+		// Measure from where the bar rests: undo the translate actually
+		// applied right now, which mid-slide is not yet `lift`.
+		const shift = new DOMMatrixReadOnly(getComputedStyle(containerEl).transform).m42;
+		const restTop = rect.top - shift;
+		const restBottom = rect.bottom - shift;
+		const desktop = window.matchMedia('(min-width: 768px)').matches;
+		const targetTop = Math.max(48, window.innerHeight * 0.1);
+		lift = desktop && inlineOpen ? Math.max(0, Math.round(restTop - targetTop)) : 0;
 		const gap = 24;
-		const available = window.innerHeight - rect.bottom - gap;
+		const available = window.innerHeight - (restBottom - lift) - gap;
 		resultsMaxHeight = Math.max(220, available);
 	}
 
@@ -53,6 +66,7 @@
 					integrationIcon: it.icon,
 					providerKey: key,
 					label: prov.label,
+					kind: prov.kind,
 					searchUrl: it.operatorDefaults?.url || it.userState?.config?.url || null
 				});
 			}
@@ -123,13 +137,15 @@
 		{ id: 'settings', bang: 'settings', label: 'Open Configure', keywords: ['settings', 'preferences', 'integrations', 'widgets'], icon: ICONS.settings, exec: () => onSettingsOpen() },
 		// manual: never auto-runs on the last keystroke; needs Enter or a click
 		{ id: 'logout', bang: 'logout', label: 'Log out', keywords: ['sign out', 'logout'], icon: ICONS.logout, manual: true, exec: () => { window.location.href = '/auth/logout'; } },
-		{
+		// Wallpapers only show in the Dynamic theme, so switch to it; otherwise
+		// the pick is saved under Light/Dark and nothing visibly changes.
+		...(siteConfig?.wallpapers?.enabled ? [{
 			id: 'wall', bang: 'wall', label: 'Pick a random wallpaper', keywords: ['wallpaper', 'background', 'shuffle'], icon: ICONS.wall,
 			exec: () => {
 				const next = Math.floor(Math.random() * TOTAL_WALLPAPERS) + 1;
-				prefs.update((p) => ({ ...p, wallpaperId: next, wallpaperEnabled: true }));
+				prefs.update((p) => ({ ...p, wallpaperId: next, wallpaperEnabled: true, theme: 'auto' }));
 			}
-		},
+		}] : []),
 		// 'auto' is the stored value; Configure calls it Dynamic, so both work.
 		...[['dark', 'Dark'], ['light', 'Light'], ['auto', 'Dynamic']].map(([t, name]) => ({
 			id: `theme-${t}`, bang: 'theme', arg: t, argAlias: name.toLowerCase(), label: `Theme: ${name}`, keywords: [t, name.toLowerCase(), `${t} mode`], icon: ICONS.theme,
@@ -382,8 +398,8 @@
 	// one-off result opens would otherwise evict app history.
 	const noteOpen = (key) => { if (key.startsWith('app:')) recordOpen(key); };
 
-	function linkActions(key, url, newTabFirst) {
-		const open = { label: 'Open', run: () => { noteOpen(key); openUrl(url, newTabFirst); finish(); } };
+	function linkActions(key, url, newTabFirst, openLabel = 'Open') {
+		const open = { label: openLabel, run: () => { noteOpen(key); openUrl(url, newTabFirst); finish(); } };
 		const other = {
 			label: newTabFirst ? 'Open in this tab' : 'Open in new tab',
 			hint: '⌘ ↵',
@@ -392,6 +408,78 @@
 		const copy = { label: 'Copy link', hint: '⌘ ⇧ C', run: () => { copyText(url); finish(); } };
 		return [open, other, copy];
 	}
+
+	// Result actions run in place (e.g. Seerr's Request): the list stays open
+	// and the poster's badge reports how it went. Keyed by result key. They
+	// never run on a plain click or Enter, which open the title; the poster
+	// shows a button for it on hover, and the ⌘K panel lists it.
+	let actionState = $state({});
+
+	async function runResultAction(key, integrationId, action) {
+		if (actionState[key]?.busy || actionState[key]?.ok) return;
+		actionState = { ...actionState, [key]: { busy: true, message: `${action.label}…` } };
+		const res = await integrationsStore.runAction(integrationId, action.key, action.params);
+		actionState = { ...actionState, [key]: { ok: res.ok, message: res.message } };
+	}
+
+	// The poster's button: Request, then a disabled Requested once it's in
+	// (or when Seerr already has a request for the title).
+	function resultAction(key, p, r) {
+		if (actionState[key]?.ok || r.meta?.requested) return { label: 'Requested', done: true };
+		if (!r.action) return null;
+		return {
+			label: r.action.label,
+			busy: !!actionState[key]?.busy,
+			run: () => runResultAction(key, p.integrationId, r.action)
+		};
+	}
+
+	function resultActions(key, p, r) {
+		const links = r.href ? linkActions(key, r.href, true, r.openLabel || 'Open') : [];
+		const extra = resultAction(key, p, r);
+		const all = extra?.run ? [...links, extra] : links;
+		return r.detail ? [{ label: 'Show details', run: () => openDetail(key, p, r) }, ...all] : all;
+	}
+
+	// Detail view (Spotlight-style) for a result with `detail` params: it
+	// replaces the list until Esc, a new query, or an arrow key.
+	let detailView = $state(null);
+	let detailSeq = 0;
+
+	async function openDetail(key, p, r) {
+		const seq = ++detailSeq;
+		detailView = { key, p, r, loading: true, data: null, error: '' };
+		try {
+			const data = await integrationsStore.details(p.integrationId, r.detail);
+			if (seq === detailSeq) detailView = { ...detailView, loading: false, data };
+		} catch (err) {
+			if (seq === detailSeq) detailView = { ...detailView, loading: false, error: err.message || 'Couldn’t load details' };
+		}
+	}
+
+	function closeDetail() {
+		detailSeq++;
+		detailView = null;
+	}
+
+	// "Play on Jellyfin": Seerr says which server it plays from; a Jellyfin or
+	// Plex result plays on itself.
+	function openOn(p, r) {
+		if (r.openLabel !== 'Play') return r.openLabel || 'Open';
+		const on = r.meta?.merge ? r.meta.playOn : p.integrationName;
+		return on ? `Play on ${on}` : 'Play';
+	}
+
+	const detail = $derived(detailView && {
+		...detailView,
+		title: detailView.data?.title || detailView.r.title,
+		thumbnail: detailView.data?.thumbnail || detailView.r.thumbnail,
+		badge: (actionState[detailView.key]?.ok === false && actionState[detailView.key].message) || '',
+		request: resultAction(detailView.key, detailView.p, detailView.r),
+		open: detailView.r.href
+			? { label: openOn(detailView.p, detailView.r), run: () => { openUrl(detailView.r.href, true); finish(); } }
+			: null
+	});
 
 	function appItem(app) {
 		const key = `app:${app.id}`;
@@ -500,19 +588,56 @@
 			if (scoredCmds.length) out.push({ id: 'commands', label: 'Commands', items: scoredCmds.map((x) => commandItem(x.a)) });
 		}
 
-		// Results from connected apps, one section each.
+		// Results from connected apps, one section each. A result marked
+		// `merge` (Seerr) stands for its title, so other providers' results for
+		// the same TMDB id are dropped rather than shown twice. The media
+		// server is the authority on what the user has: when it returned the
+		// title, the merged row plays from there and offers no Request.
+		const merged = new Set();
+		const owned = new Map();
+		for (const p of scopedProviders) {
+			for (const r of providerResults[p.providerId]?.results || []) {
+				if (!r.meta?.tmdb) continue;
+				if (r.meta.merge) merged.add(r.meta.tmdb);
+				else if (r.href && !owned.has(r.meta.tmdb)) owned.set(r.meta.tmdb, { href: r.href, name: p.integrationName });
+			}
+		}
+		// The app a poster opens in, for the small icon on its corner: the
+		// media server for a title the user has, otherwise the provider.
+		const sourceOf = (p, r) => {
+			const name = (r.meta?.merge && r.meta.playOn) || p.integrationName;
+			const it = $integrationsStore.integrations.find((i) => i.name.toLowerCase() === name.toLowerCase());
+			const icon = resolveIcon(it?.icon || p.integrationIcon);
+			if (!icon.colored) return null;
+			// Follows the icon style picked for the apps: colour, or the flat
+			// mark in white or grey.
+			const style = $prefs.iconStyle || 'colored';
+			return style === 'colored'
+				? { name: it?.name || name, icon: icon.colored, style }
+				: { name: it?.name || name, icon: icon.mono || icon.colored, fallback: icon.colored, style };
+		};
+		const fromMediaServer = (r) =>
+			r.meta?.merge && owned.has(r.meta.tmdb)
+				? { ...r, href: owned.get(r.meta.tmdb).href, openLabel: 'Play', action: undefined, meta: { ...r.meta, status: '', requested: false, playOn: owned.get(r.meta.tmdb).name } }
+				: r;
 		const provSections = scopedProviders.map((p) => {
 			const data = providerResults[p.providerId] || {};
-			const results = data.results || [];
-			const kind = results[0]?.meta?.kind || 'other';
-			const layout = kind === 'photo' ? 'grid' : kind === 'media' ? 'poster' : 'list';
+			const results = (data.results || [])
+				.filter((r) => r.meta?.merge || !merged.has(r.meta?.tmdb))
+				.map(fromMediaServer);
+			const kind = results[0]?.meta?.kind || p.kind || 'other';
+			// Navidrome is all music: compact cover-and-title cards, not posters.
+			const layout = kind === 'photo' ? 'grid' : p.integrationId === 'navidrome' ? 'tracks' : kind === 'media' ? 'poster' : 'list';
 			const max = layout === 'grid' ? 6 : layout === 'poster' ? 8 : 6;
 			return {
 				id: `p-${p.providerId}`,
+				integrationId: p.integrationId,
 				label: p.label,
 				layout,
 				kind,
 				loading: !!data.loading && q.length >= 3,
+				// Placeholder posters until the first results arrive.
+				skeleton: !!data.loading && q.length >= 3 && !results.length && layout !== 'list' ? (layout === 'poster' ? 5 : 6) : 0,
 				error: data.error || '',
 				items: [...results.slice(0, max).map((r) => {
 					const key = `r:${p.providerId}:${r.id}`;
@@ -523,10 +648,22 @@
 						subtitle: r.subtitle,
 						thumbnail: r.thumbnail,
 						kind: r.meta?.kind,
-						badge: r.meta?.status || '',
+						// A failed action reports here; success shows on the chip. The
+						// play mark already says "Available", so that badge is dropped.
+						badge: (actionState[key]?.ok === false && actionState[key].message)
+							|| (r.openLabel === 'Play' && r.meta?.status === 'Available' ? '' : r.meta?.status) || '',
+						// A movie or show the user has: the play mark on the art
+						// plays it, while a click elsewhere opens its details.
+						play: r.openLabel === 'Play' && r.href
+							? { run: () => { openUrl(r.href, true); finish(); } }
+							: null,
+						request: resultAction(key, p, r),
+						showDetail: r.detail ? () => openDetail(key, p, r) : null,
+						tmdb: r.meta?.tmdb,
+						source: layout === 'poster' ? sourceOf(p, r) : null,
 						tags: r.tags,
 						accessory: layout === 'list' ? p.integrationName : '',
-						actions: linkActions(key, r.href, true)
+						actions: resultActions(key, p, r)
 					};
 				}), ...(results.length > max && p.searchUrl ? [{
 					key: `more:${p.providerId}`,
@@ -538,34 +675,63 @@
 				}] : [])]
 			};
 		});
+		// Jellyfin, Plex and Seerr share one "Movies & TV" shelf: what you
+		// can play, then what you can request, then what's already requested.
+		// Only movies and shows move (they're the ones with a detail view);
+		// albums and artists stay in their provider's row. Navidrome and
+		// Audiobookshelf are media too, but never movies or TV.
+		const VIDEO = new Set(['jellyfin', 'plex', 'seerr']);
+		const mediaSections = provSections.filter((s) => VIDEO.has(s.integrationId));
+		if (mediaSections.length > 1) {
+			const isTitle = (it) => !it.more && it.showDetail;
+			const seen = new Set();
+			const titles = [
+				...mediaSections.flatMap((s) => s.items.filter((it) => isTitle(it) && it.play)),
+				...mediaSections.flatMap((s) => s.items.filter((it) => isTitle(it) && !it.play && !it.request?.done)),
+				...mediaSections.flatMap((s) => s.items.filter((it) => isTitle(it) && !it.play && it.request?.done))
+			].filter((it) => {
+				// Seerr already folds its own duplicates; this catches the same
+				// film on both Jellyfin and Plex. The playable copy comes first.
+				if (!it.tmdb) return true;
+				if (seen.has(it.tmdb)) return false;
+				seen.add(it.tmdb);
+				return true;
+			});
+			const shelf = {
+				id: 'p-media',
+				label: 'Movies & TV',
+				layout: 'poster',
+				kind: 'media',
+				loading: mediaSections.some((s) => s.loading),
+				skeleton: titles.length ? 0 : Math.max(...mediaSections.map((s) => s.skeleton)),
+				error: mediaSections.filter((s) => s.error).map((s) => `${s.label}: ${s.error}`).join(' · '),
+				items: [...titles, ...mediaSections.flatMap((s) => s.items.filter((it) => it.more))]
+			};
+			provSections.splice(provSections.indexOf(mediaSections[0]), 0, shelf);
+			for (const s of mediaSections) {
+				const rest = s.items.filter((it) => !it.more && !it.showDetail);
+				// What's left is music (albums, artists, songs): same cards as Navidrome.
+				if (rest.length) Object.assign(s, { layout: 'tracks', items: rest.slice(0, 6), loading: false, skeleton: 0, error: '' });
+				else provSections.splice(provSections.indexOf(s), 1);
+			}
+		}
 		provSections.sort((a, b) => (PROVIDER_KIND_ORDER[a.kind] ?? 99) - (PROVIDER_KIND_ORDER[b.kind] ?? 99));
 		out.push(...provSections);
 
-		// Fallbacks: always reachable, last in the list.
+		// Fallback: the web search, always last. One row only; each app's
+		// results are already above, and its !shortcut still scopes to it.
+		// The icon is grey so it doesn't pull the eye from the results.
 		if (q) {
 			const fb = [];
-			if (!activeScope) {
-				for (const it of $integrationsStore.integrations) {
-					if (!it.shortcut || !it.userState?.connected) continue;
-					if (it.userState?.surfaces?.search === false) continue;
-					if (!(it.availableSurfaces || []).includes('search')) continue;
-					fb.push({
-						key: `scope:${it.id}`,
-						title: `Search ${it.name} for “${q}”`,
-						subtitle: `!${it.shortcut}`,
-						appIcon: it.icon ? resolveIcon(it.icon) : null,
-						actions: [{ label: `Search ${it.name}`, run: () => { activeScope = it.id; inputEl?.focus(); } }]
-					});
-				}
-			}
 			if (searchConfig?.url) {
 				const param = searchConfig.param || 'q';
 				const url = `${searchConfig.url}${searchConfig.url.includes('?') ? '&' : '?'}${param}=${encodeURIComponent(q)}`;
-				fb.unshift({
+				fb.push({
 					key: 'web',
 					title: `Search the web for “${q}”`,
 					subtitle: searchConfig.name || 'Web',
 					appIcon: searchConfig.icon ? resolveIcon(searchConfig.icon) : undefined,
+					iconStyle: 'grayed',
 					svg: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
 					url,
 					actions: linkActions('web', url, true)
@@ -594,6 +760,7 @@
 		query;
 		panelOpen = false;
 		userMoved = false;
+		untrack(closeDetail);
 	});
 
 	function moveSelection(delta) {
@@ -704,10 +871,14 @@
 		};
 	});
 
-	// Recompute when the palette opens (the bar may have raised on focus, so
-	// its bottom edge changed) and when the scope chip appears/disappears.
+	// Recompute when the palette opens or closes (the lift and the bar's
+	// bottom edge change) and when the scope chip appears/disappears. The
+	// first pass runs before paint: deferred to a frame, the panel showed
+	// once at the old, shorter height and flashed a scrollbar.
 	$effect(() => {
-		if (inlineOpen) requestAnimationFrame(recomputeResultsMaxHeight);
+		inlineOpen;
+		untrack(recomputeResultsMaxHeight);
+		requestAnimationFrame(recomputeResultsMaxHeight);
 	});
 
 	function handleSubmit(e) {
@@ -729,6 +900,7 @@
 			e.preventDefault();
 			e.stopPropagation();
 			if (panelOpen) panelOpen = false;
+			else if (detailView) closeDetail();
 			else if (query) query = '';
 			else if (activeScope) activeScope = null;
 			else { inlineOpen = false; inputEl?.blur(); }
@@ -737,8 +909,24 @@
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			e.preventDefault();
 			inlineOpen = true;
+			if (detailView) { closeDetail(); return; }
 			moveSelection(e.key === 'ArrowDown' ? 1 : -1);
 			return;
+		}
+		// → opens the selected title's details (once the caret is at the end of
+		// the query, so it still moves through the text), ← goes back.
+		if (e.key === 'ArrowLeft' && detailView) {
+			e.preventDefault();
+			closeDetail();
+			return;
+		}
+		if (e.key === 'ArrowRight' && !detailView && !e.shiftKey && inputEl?.selectionStart === query.length) {
+			const item = flatItems.find((i) => i.key === selectedKey);
+			if (item?.showDetail) {
+				e.preventDefault();
+				item.showDetail();
+				return;
+			}
 		}
 		// Backspace at empty input with a chip → clear the scope and put "!" back in the input
 		if (e.key === 'Backspace' && activeScope && query === '' && inputEl?.selectionStart === 0) {
@@ -763,6 +951,13 @@
 				e.preventDefault();
 				activeScope = shortcutMap.get(m[1].toLowerCase());
 				query = '';
+				return;
+			}
+			// In the detail view Enter opens the title. Requesting only ever
+			// happens on a click of the Request button.
+			if (detail) {
+				e.preventDefault();
+				if (!e.repeat) detail.open?.run();
 				return;
 			}
 			const item = flatItems.find((i) => i.key === selectedKey);
@@ -820,7 +1015,7 @@
 <!-- Close when keyboard focus leaves the palette (Tab-out); click-outside is
      handled by onClickOutside. A null relatedTarget is a click on a
      non-focusable spot, which may be inside the panel, so it's ignored. -->
-<div class="relative hero-search {isPaletteOpen ? 'is-open' : ''}" bind:this={containerEl} style="--results-max-h: {resultsMaxHeight}px"
+<div class="relative hero-search {isPaletteOpen ? 'is-open' : ''}" bind:this={containerEl} style="--results-max-h: {resultsMaxHeight}px; --search-lift: {lift}px"
 	onfocusout={(e) => { if (inlineOpen && e.relatedTarget && !containerEl.contains(e.relatedTarget)) { inlineOpen = false; panelOpen = false; } }}>
 	<form
 		class="hero-search-form flex items-center px-4 md:px-6"
@@ -882,6 +1077,8 @@
 			bind:panelIndex
 			{listId}
 			{emptyText}
+			{detail}
+			ondetailclose={() => { closeDetail(); inputEl?.focus(); }}
 			onselect={(k) => { selectedKey = k; userMoved = true; }}
 			onrun={runItem}
 			onaction={(item, action) => { panelOpen = false; action.run(); }}

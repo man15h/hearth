@@ -42,6 +42,7 @@ function createIntegrationsStore() {
 	}
 
 	async function save(integrationId, payload) {
+		const wasConnected = !!get(state).integrations.find((it) => it.id === integrationId)?.userState?.connected;
 		const res = await fetch(`/api/integrations/${encodeURIComponent(integrationId)}`, {
 			method: 'PUT',
 			headers: { 'content-type': 'application/json' },
@@ -59,6 +60,8 @@ function createIntegrationsStore() {
 				it.id === integrationId ? { ...it, userState: data.userState } : it
 			)
 		}));
+		// A new connection can connect others too (Jellyfin → Seerr).
+		if (!wasConnected) load({ force: true });
 		return data;
 	}
 
@@ -73,6 +76,8 @@ function createIntegrationsStore() {
 					: it
 			)
 		}));
+		// Disconnecting Jellyfin also disconnects a Seerr linked through it.
+		load({ force: true });
 	}
 
 	async function test(integrationId, config) {
@@ -106,8 +111,33 @@ function createIntegrationsStore() {
 					it.id === integrationId ? { ...it, userState: data.userState } : it
 				)
 			}));
+			// One sign-in can connect others too (Jellyfin → Seerr).
+			load({ force: true });
 		}
 		return data;
+	}
+
+	// Runs an adapter action for a search result (e.g. Seerr's Request).
+	async function runAction(integrationId, key, params) {
+		const res = await fetch(`/api/integrations/${encodeURIComponent(integrationId)}/action/${encodeURIComponent(key)}`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ params })
+		});
+		const data = await res.json().catch(() => ({}));
+		return { ok: !!data.ok, message: data.message || data.error || `HTTP ${res.status}` };
+	}
+
+	// Detail view for a search result that carries `detail` params.
+	async function details(integrationId, params) {
+		const res = await fetch(`/api/integrations/${encodeURIComponent(integrationId)}/details`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ params })
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok || !data.details) throw new Error(data.error || `HTTP ${res.status}`);
+		return data.details;
 	}
 
 	return {
@@ -116,7 +146,9 @@ function createIntegrationsStore() {
 		save,
 		disconnect,
 		test,
-		signIn
+		signIn,
+		runAction,
+		details
 	};
 }
 

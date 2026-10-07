@@ -210,18 +210,20 @@
 	--tile-bg-default: rgba(255, 255, 255, 0.06);
 }
 
-/* Auto theme, resting bar: over a wallpaper the dark bar sinks into the
-   photo, so at rest it is white like the tiles and reads as the primary
-   control. Once the palette opens it takes the dark tokens above, so the
-   joined bar + results match the tile context menu. */
+/* Auto theme, resting bar: milky frosted glass. Mostly-opaque white with
+   the blur keeps it the page's primary control (clear glass sank into the
+   photo) while the wallpaper still softly shows through. Once the palette
+   opens it takes the dark tokens above, so the joined bar + results match
+   the tile context menu. */
 body:not(.theme-dark):not(.theme-light) .hero-search:not(.is-open) .hero-search-form {
-	--hero-search-bg: #ffffff;
-	--hero-search-border: rgba(0, 0, 0, 0.10);
+	--hero-search-bg: rgba(255, 255, 255, 0.78);
+	--hero-search-border: rgba(255, 255, 255, 0.6);
 	--hero-search-text: #18181b;
-	--hero-search-text-dim: rgba(0, 0, 0, 0.45);
+	--hero-search-text-dim: rgba(0, 0, 0, 0.5);
 	--hero-search-text-strong: rgba(0, 0, 0, 0.85);
 	--hero-search-chip-bg: rgba(0, 0, 0, 0.05);
 	--hero-search-chip-border: rgba(0, 0, 0, 0.10);
+	box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.45);
 }
 
 
@@ -789,6 +791,12 @@ body.search-active .hero-area {
 	position: relative;
 	z-index: 2;
 }
+/* The open palette lifts over the header on desktop; the header sits
+   above the search bar for its weather menu, so swap them while the
+   palette is open (the header is dimmed and inert then anyway). */
+@media (min-width: 768px) {
+	body.search-active .launcher-host { z-index: 40; }
+}
 /* Focus state on .hero-search-form (defined above) handles the open-palette
    lift; keeping a separate body.search-active shadow would compete with it. */
 
@@ -1061,7 +1069,9 @@ body.search-active .hero-area {
 	box-shadow:
 		0 12px 28px -10px rgba(0, 0, 0, 0.45),
 		0 4px 12px -4px rgba(0, 0, 0, 0.18);
-	transition: box-shadow 220ms var(--ease-standard);
+	transition:
+		box-shadow 220ms var(--ease-standard),
+		transform 220ms var(--ease-standard);
 }
 .hero-search-results kbd {
 	background: var(--hero-search-chip-bg) !important;
@@ -1545,10 +1555,12 @@ body.search-active .hero-area {
 :root {
 	--launcher-sel: rgba(255, 255, 255, 0.08);
 	--launcher-sel-ring: rgba(255, 255, 255, 0.22);
+	--launcher-sel-art: rgba(255, 255, 255, 0.85);
 }
 .theme-light {
 	--launcher-sel: rgba(0, 0, 0, 0.06);
 	--launcher-sel-ring: rgba(0, 0, 0, 0.35);
+	--launcher-sel-art: rgba(0, 0, 0, 0.7);
 }
 .launcher-panel {
 	position: absolute;
@@ -1689,16 +1701,47 @@ body.search-active .hero-area {
 	.launcher-title, .launcher-subtitle { max-width: 100%; }
 }
 
+/* Music: compact cards, small cover left, title over details. */
+.launcher-tracks {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 2px 6px;
+	padding: 0 2px 6px;
+}
+@media (max-width: 899px) { .launcher-tracks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.launcher-item.is-track {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	padding: 6px 8px;
+	border-radius: 9px;
+}
+.launcher-item.is-track.is-selected { background: var(--launcher-sel); }
+.launcher-track-art.launcher-icon-box { width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0; }
+.launcher-track-art svg { width: 18px; height: 18px; }
+.launcher-item.is-track .launcher-text { flex-direction: column; align-items: stretch; gap: 2px; }
+.launcher-item.is-track .launcher-title { font-weight: 500; }
+.launcher-item.is-track .launcher-skeleton-line { margin-top: 0; }
+.launcher-item.is-skeleton .launcher-track-art {
+	background: linear-gradient(100deg, var(--hero-search-chip-bg) 20%, var(--hero-search-chip-border) 50%, var(--hero-search-chip-bg) 80%);
+	background-size: 200% 100%;
+	animation: thumb-shimmer 1.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .launcher-item.is-skeleton .launcher-track-art { animation: none; } }
+
 /* Photo grid and poster rows */
 .launcher-grid, .launcher-posters {
 	display: flex;
 	gap: 8px;
-	padding: 2px 6px 8px;
+	/* Room for the selection ring, which the scroll box would clip. */
+	padding: 5px 6px 8px;
 	overflow-x: auto;
 	scrollbar-width: none;
 }
 .launcher-item.is-tile { flex: 0 0 auto; width: 96px; }
-.launcher-item.is-poster { flex: 0 0 auto; width: 92px; }
+.launcher-item.is-poster { flex: 0 0 auto; width: 116px; }
+.launcher-posters { gap: 14px; padding-bottom: 12px; }
 .launcher-thumb-wrap {
 	position: relative;
 	border-radius: 9px;
@@ -1741,13 +1784,16 @@ body.search-active .hero-area {
 	.launcher-thumb-wrap:has(img.is-loading)::before,
 	.launcher-icon-box:has(img.is-loading)::before { animation: none; }
 }
+/* A thin ring off the art's edge. An outline leaves the gap see-through;
+   a painted gap in the translucent panel colour read as a grey frame. */
 .launcher-item.is-selected .launcher-thumb-wrap {
-	box-shadow: 0 0 0 2px var(--hero-search-bg), 0 0 0 4px var(--launcher-sel-ring);
+	outline: 2px solid var(--launcher-sel-art);
+	outline-offset: 2px;
 }
 .launcher-badge {
 	position: absolute;
-	left: 5px;
-	bottom: 5px;
+	left: 6px;
+	top: 6px;
 	max-width: calc(100% - 10px);
 	padding: 1px 6px;
 	border-radius: 6px;
@@ -1758,10 +1804,110 @@ body.search-active .hero-area {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+/* Media posters: a play mark on what the user has, and a Request chip along
+   the bottom of the art for what they don't. The chip shows on hover (always,
+   on touch), spins while the request is filed, and stays as a disabled
+   Requested with a clock once it's in. */
+.launcher-source {
+	position: absolute;
+	right: 6px;
+	top: 6px;
+	width: 20px;
+	height: 20px;
+	padding: 3px;
+	border-radius: 6px;
+	background: rgba(9, 9, 11, 0.72);
+	pointer-events: none;
+	z-index: 1;
+}
+/* Beats the poster art's own img rule. */
+.launcher-thumb-wrap .launcher-source img { position: static; width: 100%; height: 100%; object-fit: contain; opacity: 1; }
+/* The chip stays dark in both themes, so the marks are always light. */
+.launcher-thumb-wrap .launcher-source.is-white img { filter: brightness(0) invert(1); opacity: 0.9; }
+.launcher-thumb-wrap .launcher-source.is-grayed img { filter: brightness(0) invert(1); opacity: 0.55; }
+
+.launcher-thumb-wrap:has(.launcher-source) .launcher-badge { max-width: calc(100% - 40px); }
+
+.launcher-art-action {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 38px;
+	height: 38px;
+	margin: -19px 0 0 -19px;
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: rgba(9, 9, 11, 0.62);
+	backdrop-filter: blur(6px);
+	color: #fafafa;
+	cursor: pointer;
+	opacity: 0.85;
+	transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.launcher-art-action svg { width: 16px; height: 16px; margin-left: 2px; }
+.launcher-item:hover .launcher-art-action,
+.launcher-item.is-selected .launcher-art-action { opacity: 1; }
+.launcher-art-action:hover { background: var(--accent, #f5b942); color: #09090b; transform: scale(1.08); }
+.launcher-request {
+	position: absolute;
+	left: 50%;
+	bottom: 8px;
+	transform: translateX(-50%);
+	max-width: calc(100% - 16px);
+	height: 26px;
+	padding: 0 11px;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	border: none;
+	border-radius: var(--radius-sm, 6px);
+	background: var(--accent, #f5b942);
+	color: #09090b;
+	font-size: 0.68rem;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+	opacity: 0;
+	transition: opacity 0.15s ease, background 0.15s ease;
+}
+.launcher-request svg { width: 11px; height: 11px; flex: none; }
+.launcher-request .launcher-spinner { width: 11px; height: 11px; border-color: rgba(9, 9, 11, 0.25); border-top-color: #09090b; }
+.launcher-item:hover .launcher-request,
+.launcher-item.is-selected .launcher-request,
+.launcher-request.is-busy,
+.launcher-request.is-done { opacity: 1; }
+.launcher-request:disabled { cursor: default; }
+.launcher-request.is-done {
+	background: rgba(9, 9, 11, 0.78);
+	backdrop-filter: blur(6px);
+	color: rgba(250, 250, 250, 0.78);
+	box-shadow: inset 0 0 0 1px rgba(250, 250, 250, 0.14);
+}
+@media (hover: none) {
+	.launcher-request { opacity: 1; }
+}
+/* Placeholder posters while the first results load. */
+.launcher-item.is-skeleton { pointer-events: none; }
+.launcher-item.is-skeleton .launcher-thumb-wrap,
+.launcher-skeleton-line {
+	background: linear-gradient(100deg, var(--hero-search-chip-bg) 20%, var(--hero-search-chip-border) 50%, var(--hero-search-chip-bg) 80%);
+	background-size: 200% 100%;
+	animation: thumb-shimmer 1.2s linear infinite;
+}
+.launcher-skeleton-line { height: 9px; margin-top: 9px; border-radius: 4px; width: 85%; }
+.launcher-skeleton-line.is-short { width: 50%; margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) {
+	.launcher-item.is-skeleton .launcher-thumb-wrap,
+	.launcher-skeleton-line { animation: none; }
+}
 .launcher-poster-title {
-	margin-top: 6px;
-	font-size: 0.72rem;
-	line-height: 1.25;
+	margin-top: 8px;
+	font-size: 0.74rem;
+	line-height: 1.3;
 	color: var(--hero-search-text-strong);
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
@@ -1769,12 +1915,136 @@ body.search-active .hero-area {
 	overflow: hidden;
 }
 .launcher-poster-sub {
-	font-size: 0.65rem;
+	margin-top: 3px;
+	font-size: 0.66rem;
 	color: var(--hero-search-text-dim);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
+/* Detail view: one title, Spotlight-style, in place of the result list. */
+.launcher-detail { padding: 8px 8px 24px; }
+.launcher-detail-hero {
+	position: relative;
+	height: 156px;
+	border-radius: var(--radius-md, 10px) var(--radius-md, 10px) 0 0;
+	overflow: hidden;
+}
+.launcher-detail-backdrop {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transition: opacity 0.2s ease;
+	/* Fade into the panel so the poster and title sit on it. */
+	mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+}
+.launcher-detail-backdrop.is-loading { opacity: 0; }
+/* No backdrop: just room for the back button, and no overlap below. */
+.launcher-detail-hero.is-empty { height: 44px; }
+.launcher-detail-hero.is-empty + .launcher-detail-body { margin-top: 0; }
+.launcher-detail-hero.is-empty + .launcher-detail-body .launcher-detail-info { padding-top: 0; }
+.launcher-detail-back {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 3px 9px 3px 5px;
+	border: none;
+	border-radius: var(--radius-sm, 6px);
+	background: rgba(9, 9, 11, 0.6);
+	color: #fafafa;
+	font-size: 0.7rem;
+	cursor: pointer;
+}
+.launcher-detail-back svg { width: 14px; height: 14px; }
+.launcher-detail-back:hover { background: rgba(9, 9, 11, 0.8); }
+.launcher-detail-body {
+	position: relative;
+	display: flex;
+	gap: 20px;
+	margin: -60px 20px 0;
+}
+.launcher-detail-poster {
+	flex: 0 0 auto;
+	width: 108px;
+	aspect-ratio: 2 / 3;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.launcher-detail-info {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	gap: 8px;
+	padding-top: 60px;
+}
+.launcher-detail-title {
+	margin: 0;
+	font-size: 1.2rem;
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--hero-search-text);
+}
+.launcher-detail-facts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 6px;
+	font-size: 0.72rem;
+	color: var(--hero-search-text-dim);
+}
+.launcher-detail-facts > span + span::before { content: '·'; margin-right: 6px; }
+.launcher-detail-rating { display: inline-flex; align-items: center; gap: 3px; color: var(--hero-search-text-strong); }
+.launcher-detail-rating svg { width: 11px; height: 11px; color: var(--accent, #f5b942); }
+.launcher-detail-info .launcher-tags { flex-wrap: wrap; }
+.launcher-detail-buttons { display: flex; gap: 8px; margin-top: 6px; }
+.launcher-detail-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 6px 12px;
+	border: none;
+	border-radius: var(--radius-sm, 6px);
+	background: var(--hero-search-chip-bg);
+	color: var(--hero-search-text-strong);
+	box-shadow: inset 0 0 0 1px var(--hero-search-chip-border);
+	font-size: 0.75rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.launcher-detail-btn svg { width: 13px; height: 13px; }
+.launcher-detail-btn.is-primary {
+	background: var(--accent, #f5b942);
+	color: #09090b;
+	box-shadow: none;
+}
+.launcher-detail-btn.is-primary.is-done {
+	background: var(--hero-search-chip-bg);
+	color: var(--hero-search-text-dim);
+	box-shadow: inset 0 0 0 1px var(--hero-search-chip-border);
+}
+.launcher-detail-btn:disabled { cursor: default; }
+.launcher-detail-error { font-size: 0.72rem; }
+/* The app's own font, like the rest of the panel: a system-font stack
+   fell through to the browser default where those fonts aren't installed. */
+.launcher-detail-text {
+	max-width: 72ch;
+	margin: 18px 20px 0;
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	line-height: 1.7;
+	color: var(--hero-search-text-strong);
+}
+.launcher-detail-text p { margin: 0 0 10px; }
+.launcher-detail-tagline { font-style: italic; color: var(--hero-search-text-dim); }
+.launcher-detail-cast { color: var(--hero-search-text-dim); }
+.launcher-detail-cast span { color: var(--hero-search-text-strong); font-weight: 600; margin-right: 4px; }
 
 /* Footer bar */
 .launcher-footer {
@@ -1870,6 +2140,18 @@ body.search-active .hero-area {
 .hero-search-input { font-size: 16px; text-overflow: ellipsis; }
 @media (min-width: 768px) {
 	.hero-search-input { font-size: 0.95rem; }
+}
+/* Desktop: the open palette rises toward the top of the viewport
+   (SearchBar sets --search-lift) so results get the screen height. */
+@media (min-width: 768px) {
+	.hero-search {
+		transform: translateY(calc(-1 * var(--search-lift, 0px)));
+		transition: transform 220ms var(--ease-standard);
+	}
+}
+@media (min-width: 768px) and (prefers-reduced-motion: reduce) {
+	.hero-search,
+	.hero-search.is-open { transition: none; }
 }
 
 /* ── Phones: search docked at the bottom, in thumb reach ───────

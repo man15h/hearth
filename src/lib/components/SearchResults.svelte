@@ -6,8 +6,9 @@
 	// the keyboard; this only renders. Focus never leaves the input: the
 	// selected row is announced through aria-activedescendant.
 	//
-	// sections: [{ id, label, layout: 'list'|'grid'|'poster', loading, error, items }]
-	// item:     { key, title, subtitle?, accessory?, appIcon?, svg?, thumbnail?, kind?, actions: [{ label, hint?, run }] }
+	// sections: [{ id, label, layout: 'list'|'grid'|'poster'|'tracks', loading, error, items }]
+	// item:     { key, title, subtitle?, accessory?, appIcon?, svg?, thumbnail?, kind?, badge?, play?,
+	//             iconStyle?, play?: { run }, request?: { label, busy, run }, actions: [{ label, hint?, run }] }
 	let {
 		sections = [],
 		selectedKey = null,
@@ -15,6 +16,8 @@
 		panelIndex = $bindable(0),
 		listId = 'launcher-list',
 		emptyText = '',
+		detail = null,
+		ondetailclose = () => {},
 		onselect = () => {},
 		onrun = () => {},
 		onaction = () => {},
@@ -52,6 +55,15 @@
 		e.currentTarget.style.display = 'none';
 	}
 
+	// In the white and grey styles the source icon is the app's flat mark; an
+	// app without one shows its colour icon as a silhouette (same filter). A
+	// failed icon hides.
+	function sourceIconFailed(e, fallback) {
+		const img = e.currentTarget;
+		if (fallback && img.getAttribute('src') !== fallback) img.src = fallback;
+		else img.parentElement.style.display = 'none';
+	}
+
 	// Thumbnails start hidden behind a shimmer and fade in once decoded. A
 	// cached image can finish before the handler is attached, so check
 	// `complete` on mount too.
@@ -69,6 +81,82 @@
 </script>
 
 <div class="launcher-panel hero-search-results">
+	{#if detail}
+		<!-- Detail view: one title, Spotlight-style, in place of the list. -->
+		<div class="launcher-scroll launcher-detail" role="region" aria-label="Details for {detail.title}">
+			<div class="launcher-detail-hero" class:is-empty={!detail.loading && !detail.data?.backdrop}>
+				{#if detail.data?.backdrop}
+					<img class="launcher-detail-backdrop is-loading" use:thumbLoading src={detail.data.backdrop} alt="" referrerpolicy="no-referrer" onerror={thumbFailed} />
+				{/if}
+				<button type="button" class="launcher-detail-back" onmousedown={(e) => e.preventDefault()} onclick={ondetailclose}>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+					Results
+				</button>
+			</div>
+			<div class="launcher-detail-body">
+				<div class="launcher-detail-poster launcher-thumb-wrap">
+					{#if detail.thumbnail}
+						<img class="is-loading" use:thumbLoading src={detail.thumbnail} alt="" referrerpolicy="no-referrer" onerror={thumbFailed} />
+					{/if}
+					<svg class="launcher-thumb-fallback" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">{@html KIND_ICONS.media}</svg>
+				</div>
+				<div class="launcher-detail-info">
+					<h3 class="launcher-detail-title">{detail.title}</h3>
+					{#if detail.data}
+						<div class="launcher-detail-facts">
+							{#each detail.data.facts || [] as fact}<span>{fact}</span>{/each}
+							{#if detail.data.rating}
+								<span class="launcher-detail-rating">
+									<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+									{detail.data.rating}
+								</span>
+							{/if}
+						</div>
+						{#if detail.data.genres?.length}
+							<div class="launcher-tags">{#each detail.data.genres as g}<span class="launcher-tag">{g}</span>{/each}</div>
+						{/if}
+					{:else if detail.r?.subtitle}
+						<div class="launcher-detail-facts"><span>{detail.r.subtitle}</span></div>
+					{/if}
+					<div class="launcher-detail-buttons">
+						{#if detail.request}
+							<button
+								type="button"
+								class="launcher-detail-btn is-primary"
+								class:is-done={detail.request.done}
+								disabled={detail.request.busy || detail.request.done}
+								onmousedown={(e) => e.preventDefault()}
+								onclick={() => detail.request.run?.()}
+							>
+								{#if detail.request.done}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{/if}
+								{detail.request.busy ? `${detail.request.label}…` : detail.request.label}
+							</button>
+						{/if}
+						{#if detail.open}
+							<button type="button" class="launcher-detail-btn" class:is-primary={!detail.request} onmousedown={(e) => e.preventDefault()} onclick={detail.open.run}>
+								{#if detail.open.label.startsWith('Play')}<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>{/if}
+								{detail.open.label}
+							</button>
+						{/if}
+					</div>
+					{#if detail.badge}<div class="launcher-error launcher-detail-error">{detail.badge}</div>{/if}
+				</div>
+			</div>
+			{#if detail.loading}
+				<div class="launcher-detail-text"><span class="launcher-spinner" role="status" aria-label="Loading details"></span></div>
+			{:else if detail.error}
+				<div class="launcher-error">{detail.error}</div>
+			{:else if detail.data}
+				<div class="launcher-detail-text">
+					{#if detail.data.tagline}<p class="launcher-detail-tagline">{detail.data.tagline}</p>{/if}
+					{#if detail.data.overview}<p>{detail.data.overview}</p>{/if}
+					{#if detail.data.cast?.length}
+						<p class="launcher-detail-cast"><span>Cast</span> {detail.data.cast.join(' · ')}</p>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{:else}
 	<div class="launcher-scroll" id={listId} role="listbox" aria-label="Results">
 		{#each sections as section (section.id)}
 			{#if section.items.length || section.loading || section.error}
@@ -80,7 +168,20 @@
 					{#if section.error}
 						<div class="launcher-error">{section.error}</div>
 					{/if}
-					<div class={section.layout === 'grid' ? 'launcher-grid' : section.layout === 'poster' ? 'launcher-posters' : 'launcher-rows'}>
+					<div class={section.layout === 'grid' ? 'launcher-grid' : section.layout === 'poster' ? 'launcher-posters' : section.layout === 'tracks' ? 'launcher-tracks' : 'launcher-rows'}>
+						{#each { length: section.skeleton || 0 } as _}
+							{#if section.layout === 'tracks'}
+								<div class="launcher-item is-skeleton is-track" aria-hidden="true">
+									<div class="launcher-icon-box launcher-track-art"></div>
+									<span class="launcher-text"><span class="launcher-skeleton-line"></span><span class="launcher-skeleton-line is-short"></span></span>
+								</div>
+							{:else}
+								<div class="launcher-item is-skeleton {section.layout === 'grid' ? 'is-tile' : 'is-poster'}" aria-hidden="true">
+									<div class="launcher-thumb-wrap"></div>
+									{#if section.layout === 'poster'}<div class="launcher-skeleton-line"></div><div class="launcher-skeleton-line is-short"></div>{/if}
+								</div>
+							{/if}
+						{/each}
 						{#each section.items as item (item.key)}
 							{@const isSel = item.key === selectedKey}
 							<div
@@ -89,7 +190,7 @@
 								aria-selected={isSel}
 								aria-label={section.layout === 'list' ? undefined : [item.title, item.subtitle, item.badge].filter(Boolean).join(', ')}
 								tabindex="-1"
-								class="launcher-item {section.layout === 'grid' ? 'is-tile' : section.layout === 'poster' ? 'is-poster' : 'is-row'}"
+								class="launcher-item {section.layout === 'grid' ? 'is-tile' : section.layout === 'poster' ? 'is-poster' : section.layout === 'tracks' ? 'is-track' : 'is-row'}"
 								class:is-selected={isSel}
 								use:scrollIntoView={isSel}
 								onpointermove={() => { if (!isSel) onselect(item.key); }}
@@ -97,7 +198,23 @@
 								onclick={(e) => onrun(item, e)}
 								onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); onrun(item, e); } }}
 							>
-								{#if item.more && section.layout !== 'list'}
+								{#if section.layout === 'tracks'}
+									<!-- Music: small square cover, title over details. -->
+									<div class="launcher-icon-box launcher-track-art">
+										{#if item.more}
+											<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">{@html item.svg}</svg>
+										{:else}
+											<svg class="launcher-thumb-fallback" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">{@html KIND_ICONS[item.kind] || KIND_ICONS.file}</svg>
+											{#if item.thumbnail}
+												<img class="is-loading" use:thumbLoading src={item.thumbnail} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={thumbFailed} />
+											{/if}
+										{/if}
+									</div>
+									<span class="launcher-text">
+										<span class="launcher-title">{item.title}</span>
+										{#if item.subtitle}<span class="launcher-subtitle">{item.subtitle}</span>{/if}
+									</span>
+								{:else if item.more && section.layout !== 'list'}
 									<div class="launcher-thumb-wrap launcher-more">{item.title}</div>
 								{:else if section.layout === 'grid' || section.layout === 'poster'}
 									<div class="launcher-thumb-wrap">
@@ -105,7 +222,40 @@
 											<img class="is-loading" use:thumbLoading src={item.thumbnail} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={thumbFailed} />
 										{/if}
 										<svg class="launcher-thumb-fallback" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">{@html KIND_ICONS[item.kind] || KIND_ICONS.file}</svg>
+										{#if item.play}
+											<button
+												type="button"
+												class="launcher-art-action"
+												tabindex="-1"
+												aria-label="Play {item.title}"
+												onmousedown={(e) => e.preventDefault()}
+												onclick={(e) => { e.stopPropagation(); item.play.run(); }}
+											>
+												<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>
+											</button>
+										{:else if item.request}
+											<button
+												type="button"
+												class="launcher-request"
+												class:is-busy={item.request.busy}
+												class:is-done={item.request.done}
+												tabindex="-1"
+												disabled={item.request.busy || item.request.done}
+												onmousedown={(e) => e.preventDefault()}
+												onclick={(e) => { e.stopPropagation(); item.request.run?.(); }}
+											>
+												{#if item.request.busy}
+													<span class="launcher-spinner" aria-hidden="true"></span>
+												{:else if item.request.done}
+													<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+												{:else}
+													<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+												{/if}
+												{item.request.busy ? 'Requesting' : item.request.label}
+											</button>
+										{/if}
 										{#if item.badge}<span class="launcher-badge">{item.badge}</span>{/if}
+										{#if item.source}<span class="launcher-source is-{item.source.style}" title={item.source.name}><img src={item.source.icon} alt={item.source.name} onerror={(e) => sourceIconFailed(e, item.source.fallback)} /></span>{/if}
 									</div>
 									{#if section.layout === 'poster'}
 										<div class="launcher-poster-title">{item.title}</div>
@@ -114,7 +264,7 @@
 								{:else}
 									<span class="launcher-icon">
 										{#if item.appIcon !== undefined}
-											<AppIcon icon={item.appIcon} name={item.title} size="w-[18px] h-[18px]" wrapSize="w-7 h-7" iconStyle="colored" wrap />
+											<AppIcon icon={item.appIcon} name={item.title} size="w-[18px] h-[18px]" wrapSize="w-7 h-7" iconStyle={item.iconStyle || 'colored'} wrap />
 										{:else if item.thumbnail}
 											<span class="launcher-icon-box">
 												<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">{@html KIND_ICONS[item.kind] || KIND_ICONS.file}</svg>
@@ -147,9 +297,21 @@
 			<div class="launcher-empty">{emptyText}</div>
 		{/if}
 	</div>
+	{/if}
 
 	<!-- Footer bar: what Enter does, and where the rest of the actions live. -->
 	<div class="launcher-footer">
+		{#if detail}
+			<span class="launcher-footer-hint">
+				<Keys keys="←" /> <Keys keys="esc" /> back
+			</span>
+			{@const enter = detail.open}
+			{#if enter}
+				<button type="button" class="launcher-footer-btn" onmousedown={(e) => e.preventDefault()} onclick={() => enter.run()}>
+					{enter.label} <Keys keys="↵" />
+				</button>
+			{/if}
+		{:else}
 		<span class="launcher-footer-hint">
 			<Keys keys="↑ ↓" /> to move
 		</span>
@@ -164,9 +326,10 @@
 				</button>
 			{/if}
 		{/if}
+		{/if}
 	</div>
 
-	{#if panelOpen && selected}
+	{#if panelOpen && selected && !detail}
 		<div class="launcher-actions" role="menu" aria-label="Actions for {selected.title}">
 			<div class="launcher-actions-title">{selected.title}</div>
 			{#each selected.actions as action, i}

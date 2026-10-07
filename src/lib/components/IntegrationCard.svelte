@@ -48,9 +48,35 @@
 
 	const connected = $derived(!!integration.userState?.connected);
 	const hasSearch = $derived((integration.availableSurfaces || []).includes('search'));
-	const hasWidgets = $derived((integration.availableSurfaces || []).includes('widgets'));
 	const visibleFields = $derived(integration.configSchema.filter((f) => !f.hidden));
 	const signedInAs = $derived(integration.signIn && connected ? integration.userState?.config?.userName : '');
+	// Seerr signs in through Jellyfin or Plex: say so on all three cards.
+	const VIA = { jellyfin: 'Jellyfin', plex: 'Plex' };
+	const nameOf = (id) => $integrationsStore.integrations.find((i) => i.id === id)?.name;
+	// "Sign in with Plex" once Holm knows which app this Seerr uses.
+	const signLabel = $derived(
+		integration.linkedTo?.length === 1 && nameOf(integration.linkedTo[0])
+			? `Sign in with ${nameOf(integration.linkedTo[0])}`
+			: integration.signIn?.label
+	);
+	// The app a connected Seerr signed in through, for the link chip.
+	const linkedThrough = $derived.by(() => {
+		const id = connected && VIA[integration.userState?.config?.via] ? integration.userState.config.via : null;
+		const it = id && $integrationsStore.integrations.find((i) => i.id === id);
+		return it ? { name: it.name, icon: resolveIcon(it.icon) } : null;
+	});
+	// Shown on an unconnected card, and when a card is open; a closed,
+	// connected one lets the link chip say it.
+	const linkNote = $derived.by(() => {
+		if (connected) {
+			const via = VIA[integration.userState?.config?.via];
+			return via ? `Connected through ${nameOf(integration.userState.config.via) || via}` : '';
+		}
+		// Seerr just connects once Jellyfin or Plex does; no hint needed.
+		if (integration.linkedTo) return '';
+		const signsIn = $integrationsStore.integrations.filter((i) => i.linkedTo?.includes(integration.id)).map((i) => i.name);
+		return signsIn.length ? `Also signs you in to ${signsIn.join(' and ')}` : '';
+	});
 
 	// Sign-in flow: { flowId, code } while waiting for approval elsewhere.
 	let signFlow = $state(null);
@@ -67,13 +93,22 @@
 		try {
 			const res = await integrationsStore.signIn(integration.id, { action: 'start', config: formConfig });
 			if (seq !== flowSeq) return;
-			signFlow = { flowId: res.flowId, code: res.code };
+			// Signed in straight away through a linked account; no code.
+			if (res.status === 'done') return signedIn();
+			signFlow = { flowId: res.flowId, code: res.code, link: res.link, help: res.help };
 			schedulePoll(seq);
 		} catch (err) {
 			if (seq === flowSeq) signError = err.message || 'Sign-in failed';
 		} finally {
 			signStarting = false;
 		}
+	}
+
+	function signedIn() {
+		formConfig = seedConfig();
+		formSurfaces = seedSurfaces();
+		dirty = false;
+		onCollapseRequest();
 	}
 
 	function schedulePoll(seq) {
@@ -85,10 +120,7 @@
 				if (res.status === 'pending') return schedulePoll(seq);
 				signFlow = null;
 				if (res.status === 'done') {
-					formConfig = seedConfig();
-					formSurfaces = seedSurfaces();
-					dirty = false;
-					onCollapseRequest();
+					signedIn();
 				} else {
 					signError = res.status === 'expired' ? 'The code expired — start again' : res.error || 'Sign-in failed';
 				}
@@ -265,6 +297,8 @@
 			<span class="text-[0.8rem] text-content font-medium">{integration.name}</span>
 			{#if signedInAs && !expanded}
 				<span class="block text-[0.7rem] text-content-dim truncate">Signed in as {signedInAs}</span>
+			{:else if linkNote && (expanded || !connected)}
+				<span class="block text-[0.7rem] text-content-dim truncate">{linkNote}</span>
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">
@@ -274,6 +308,16 @@
 					onclick={cancelEdit}
 				>Cancel</button>
 			{:else if connected}
+				{#if linkedThrough}
+					<span
+						class="flex items-center gap-1 text-content-dim px-1.5 py-1 rounded-lg border border-border-card"
+						title="Connected through {linkedThrough.name}"
+						aria-label="Connected through {linkedThrough.name}"
+					>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+						<AppIcon icon={linkedThrough.icon} name={linkedThrough.name} size="w-3.5 h-3.5" {iconStyle} />
+					</span>
+				{/if}
 				<span class="text-[0.7rem] font-mono text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-400/30 bg-emerald-500/5">Connected</span>
 				<div class="relative" bind:this={menuEl}>
 					<button
@@ -358,12 +402,12 @@
 						<div class="rounded-lg border border-border-card bg-surface-card/40 px-3 py-3 text-center" role="status" aria-live="polite">
 							<div class="text-[0.7rem] text-content-dim mb-1.5">Your code</div>
 							<div class="signin-digits font-mono text-content" aria-label="Code {signFlow.code.split('').join(' ')}">{signFlow.code}</div>
-							{#if integration.signIn.help}
-								<div class="field-help text-[0.7rem] text-content-dim mt-2 leading-relaxed">{@html marked.parse(integration.signIn.help)}</div>
+							{#if signFlow.help || integration.signIn.help}
+								<div class="field-help text-[0.7rem] text-content-dim mt-2 leading-relaxed">{@html marked.parse(signFlow.help || integration.signIn.help)}</div>
 							{/if}
-							{#if formConfig.url}
+							{#if signFlow.link}
 								<a
-									href="{formConfig.url.replace(/\/$/, '')}/web/#/quickconnect"
+									href={signFlow.link}
 									target="_blank"
 									rel="noopener noreferrer"
 									class="inline-block text-[0.7rem] text-blue-400 hover:text-blue-300 mt-1 no-underline hover:underline"
@@ -391,7 +435,7 @@
 								class="py-1.5 px-3 rounded-lg text-[0.75rem] font-mono bg-surface-card-strong text-content border border-border-card cursor-pointer hover:bg-surface-card-strong transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 								disabled={signStarting || !formConfig.url}
 								onclick={startSignIn}
-							>{signStarting ? 'Getting a code…' : connected ? 'Sign in again' : integration.signIn.label}</button>
+							>{signStarting ? 'Getting a code…' : connected ? 'Sign in again' : signLabel}</button>
 						{/if}
 					</div>
 				{:else}
@@ -484,6 +528,10 @@
 	.field-help :global(strong) {
 		color: var(--content-muted, #aaa);
 		font-weight: 600;
+	}
+	.field-help :global(a) {
+		color: var(--color-content);
+		font-weight: 700;
 	}
 	.field-help :global(code) {
 		font-size: 0.65rem;

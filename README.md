@@ -10,7 +10,7 @@ Most self-hosted dashboards are built by one admin, for one admin. Holm is for t
 
 - **Multi-user from the start.** Every person has their own layout, theme and bookmarks, stored server-side and synced across devices. You curate the catalog; they pick from it.
 - **Uses the login you already have.** OIDC with Authelia, Authentik, Keycloak, Zitadel or any provider. Admins are decided by group or username.
-- **A launcher, not just a grid.** Type anywhere (or `⌘K` / `Ctrl+K`) to find apps, run commands, and search inside Immich, Paperless, Nextcloud, Jellyfin, Planka and Karakeep, each with the user's own login.
+- **A launcher, not just a grid.** Type anywhere (or `⌘K` / `Ctrl+K`) to find apps, run commands, and search inside Immich, Paperless, Nextcloud, Jellyfin, Plex, Navidrome, Audiobookshelf, Mealie, Seerr, Planka and Karakeep, each with the user's own login.
 - **Onboarding for non-technical people.** Welcome slides, per-app setup guides with App Store / Play links, and gentle tips for the first week.
 - **One YAML file, hot-reloaded.** No admin UI to keep in sync, no restart on change.
 - **Small and private.** A single container (amd64 / arm64) with built-in SQLite, so there's no separate database to run. No telemetry. Weather comes from Open-Meteo with no API key needed.
@@ -24,6 +24,11 @@ Search reaches inside the apps people have connected, with their own login: one 
 
 ![Launcher searching Jellyfin, Paperless and Immich at once](docs/screenshots/integrations.jpg)
 <sub>Mock data. Search-result photos in these screenshots are CC0 from Wikimedia Commons; the <i>Spring</i> poster is by Blender Studio, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</sub>
+
+With Seerr connected, films and shows that aren't on the media server yet can be requested right from the results, as that person. Titles already there play in Jellyfin or Plex.
+
+![Launcher with Seerr: play what's there, request what isn't](docs/screenshots/seerr.jpg)
+<sub>Mock data. Posters are Blender open movies from Wikimedia Commons: <i>Spring</i>, <i>Sprite Fright</i> and <i>Cosmos Laundromat</i> <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; <i>Sintel</i>, <i>Big Buck Bunny</i> and <i>Tears of Steel</i> <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>, © Blender Foundation / Blender Studio.</sub>
 
 Each app can carry a short setup guide: what to install, the steps, and the server URL to copy.
 
@@ -102,6 +107,11 @@ What Holm deliberately leaves out: server stats, container health, uptime widget
 | Paperless-ngx | Documents |
 | Nextcloud | Files |
 | Jellyfin | Movies, shows and music (Quick Connect sign-in) |
+| Plex | Movies, shows and music (sign-in at plex.tv/link) |
+| Navidrome | Artists, albums and songs |
+| Audiobookshelf | Audiobooks and podcasts |
+| Mealie | Recipes |
+| Seerr | Movies and shows: play or request (signs in through Jellyfin or Plex) |
 | Planka | Boards and cards |
 | Karakeep | Bookmarks |
 

@@ -17,6 +17,7 @@
  * @property {{ baseKey: string, path: string, label: string }} [helpUrl]  Clickable link built from config[baseKey] + path
  * @property {string} [fromOperatorDefault]     If set, the form pre-fills from `integrations.<id>.<value>` in config.yml
  * @property {boolean} [hidden]                 Stored and redacted like any field, but never rendered — filled by `signIn`
+ * @property {boolean} [trim]                   Defaults to true; set false where surrounding spaces matter (a password)
  */
 
 /**
@@ -32,16 +33,39 @@
  * @property {string} [subtitle]                Secondary text (e.g. URL, tags, category)
  * @property {string} [thumbnail]               URL of an image; rendered as a tile
  * @property {string} href                      Where to send the user when they click
+ * @property {string} [openLabel]               Label for opening `href`, e.g. 'Play'; defaults to 'Open'
+ * @property {object} [detail]                  Params for the adapter's `details`; a click opens the detail view instead of `href`
+ * @property {{ key: string, label: string, params: object }} [action]  Runs `actions[key]` with `params` from a button on the result (e.g. 'Request'); a click still opens `href`
  * @property {Object} [meta]
  * @property {string} [meta.kind]               'photo' triggers the photo-grid variant in SearchResults
  * @property {string} [meta.takenAt]
+ * @property {string} [meta.status]             Short badge, e.g. 'Available'
+ * @property {string} [meta.tmdb]               '<movie|tv>:<tmdb id>' — identifies the title across providers
+ * @property {boolean} [meta.merge]             This result stands for its title: other providers' results with the same `meta.tmdb` are hidden
  */
 
 /**
  * @typedef {Object} SearchProvider
  * @property {string} label                     Shown in the provider switcher dropdown
  * @property {'inline'|'redirect'} mode         inline = dropdown of results; redirect = form-submit to an external URL
- * @property {(ctx: { config: object, query: string, limit: number, fetch: typeof fetch }) => Promise<{ results: SearchResultItem[] }>} query
+ * @property {'media'|'photo'} [kind]          Results are posters or photos, so the bar shows placeholders of that shape while the first ones load
+ * @property {(ctx: AdapterContext & { query: string, limit: number }) => Promise<{ results: SearchResultItem[] }>} query
+ */
+
+/**
+ * @typedef {Object} AdapterContext
+ * @property {object} config                     The user's stored config
+ * @property {typeof fetch} fetch
+ * @property {Record<string, object>} [linked]   Only for `linkedTo` adapters: the user's configs for those integrations, when connected
+ * @property {(config: object) => Promise<void>} [saveConfig]  Only for `linkedTo` adapters: replaces the stored config (e.g. a renewed session)
+ */
+
+/**
+ * @typedef {Object} Action
+ * A write the user triggers from a search result (`SearchResultItem.action`),
+ * run by POST /api/integrations/:id/action/:key. `params` come from the
+ * browser, so validate them.
+ * @property {(ctx: AdapterContext & { params: object }) => Promise<TestResult>} run
  */
 
 /**
@@ -69,8 +93,8 @@
  *
  * @property {string} label                                    Button text, e.g. 'Sign in with Quick Connect'
  * @property {string} [help]                                   Markdown shown next to the code
- * @property {(ctx: { config: object, fetch: typeof fetch }) => Promise<{ code: string, state: object } | { error: string }>} start
- * @property {(ctx: { config: object, state: object, fetch: typeof fetch }) => Promise<{ status: 'pending' } | { status: 'done', config: object } | { status: 'error', error: string }>} poll
+ * @property {(ctx: { config: object, linked?: Record<string, object>, fetch: typeof fetch }) => Promise<{ code: string, link?: string, help?: string, state: object } | { error: string }>} start  `link` is where the user enters the code; `help` replaces `signIn.help` while the code shows
+ * @property {(ctx: { config: object, state: object, fetch: typeof fetch }) => Promise<{ status: 'pending' } | { status: 'done', config: object, forLinked?: object } | { status: 'error', error: string }>} poll  `forLinked` is lent to `linkedTo` adapters for one connect and never saved (Plex: the account token)
  */
 
 /**
@@ -83,6 +107,12 @@
  * @property {(ctx: { config: object, fetch: typeof fetch }) => Promise<TestResult>} test
  * @property {SignIn} [signIn]                                 Replaces the Test/Connect buttons with a code-approval flow
  * @property {(ctx: { config: object, fetch: typeof fetch }) => Promise<void>} [signOut]  Best-effort token revoke on disconnect
+ * @property {string[]} [linkedTo]                       Ids of integrations this one can sign in through (Seerr: jellyfin, plex)
+ * @property {(ctx: { config: object, linked: Record<string, object>, fetch: typeof fetch }) => Promise<object|{ error: string }|null>} [connectFromLinked]  Connects the user without asking, from a linked connection; returns the config to save, null to fall back to `signIn`, or `{ error }` when a code would fail the same way
+ * @property {(ctx: { config: object, fetch: typeof fetch }) => Promise<string[]>} [linkedVia]  Which of `linkedTo` can sign in at the operator's URL (Seerr: the server it runs on), for the cards' wording
+ * @property {Record<string, Action>} [actions]             Writes triggered from search results
+ * @property {(ctx: AdapterContext & { params: object }) => Promise<{ title: string, facts?: string[], rating?: number|null, genres?: string[], tagline?: string, overview?: string, cast?: string[], thumbnail?: string, backdrop?: string } | null>} [details]  Detail view for a result's `detail` params; null when they're invalid
+ * @property {(ctx: { config: object }) => object} [prepareConfig]  Rewrites the merged config just before it is saved, e.g. swapping a password for a derived token
  * @property {Record<string, SearchProvider>} [searchProviders]
  * @property {Record<string, ProxyHandler>} [proxy]            Optional proxy handlers keyed by name (e.g. 'thumbnail')
  * @property {Record<string, object>} [widgets]                Reserved — widget rendering is out of scope for this PR
