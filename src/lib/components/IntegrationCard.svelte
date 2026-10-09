@@ -48,10 +48,12 @@
 
 	const connected = $derived(!!integration.userState?.connected);
 	const hasSearch = $derived((integration.availableSurfaces || []).includes('search'));
+	const hasWidgets = $derived((integration.availableSurfaces || []).includes('widgets') && integration.widgets?.length > 0);
 	const visibleFields = $derived(integration.configSchema.filter((f) => !f.hidden));
 	const signedInAs = $derived(integration.signIn && connected ? integration.userState?.config?.userName : '');
-	// Seerr signs in through Jellyfin or Plex: say so on all three cards.
-	const VIA = { jellyfin: 'Jellyfin', plex: 'Plex' };
+	// Seerr can sign in through Jellyfin or Plex: config.via names the app,
+	// or the integration itself for a direct sign-in.
+	const viaId = $derived(connected && integration.userState?.config?.via !== integration.id ? integration.userState?.config?.via || null : null);
 	const nameOf = (id) => $integrationsStore.integrations.find((i) => i.id === id)?.name;
 	// "Sign in with Plex" once Holm knows which app this Seerr uses.
 	const signLabel = $derived(
@@ -61,16 +63,14 @@
 	);
 	// The app a connected Seerr signed in through, for the link chip.
 	const linkedThrough = $derived.by(() => {
-		const id = connected && VIA[integration.userState?.config?.via] ? integration.userState.config.via : null;
-		const it = id && $integrationsStore.integrations.find((i) => i.id === id);
+		const it = viaId && $integrationsStore.integrations.find((i) => i.id === viaId);
 		return it ? { name: it.name, icon: resolveIcon(it.icon) } : null;
 	});
 	// Shown on an unconnected card, and when a card is open; a closed,
 	// connected one lets the link chip say it.
 	const linkNote = $derived.by(() => {
 		if (connected) {
-			const via = VIA[integration.userState?.config?.via];
-			return via ? `Connected through ${nameOf(integration.userState.config.via) || via}` : '';
+			return viaId ? `Connected through ${nameOf(viaId) || viaId[0].toUpperCase() + viaId.slice(1)}` : '';
 		}
 		// Seerr just connects once Jellyfin or Plex does; no hint needed.
 		if (integration.linkedTo) return '';
@@ -480,12 +480,29 @@
 							</div>
 						</button>
 					{/if}
-					<div class="flex items-center justify-between py-1 opacity-50" title="Coming in a future release">
-						<span class="text-[0.75rem] text-content-muted">Widgets <span class="text-[0.7rem] text-content-dim">(soon)</span></span>
-						<div class="w-9 h-5 rounded-full bg-surface-toggle-off relative shrink-0">
-							<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow translate-x-0.5"></div>
+					{#if hasWidgets}
+						<button
+							class="flex items-center justify-between w-full bg-transparent border-none cursor-pointer text-left py-1 gap-3"
+							role="switch"
+							aria-checked={!!formSurfaces.widgets}
+							onclick={() => toggleSurface('widgets')}
+						>
+							<span class="min-w-0">
+								<span class="block text-[0.75rem] text-content-muted">{integration.widgets.map((w) => w.label).join(', ')}</span>
+								<span class="block text-[0.7rem] text-content-dim">{integration.widgets.map((w) => w.description).filter(Boolean).join(' · ')}</span>
+							</span>
+							<div class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0 {formSurfaces.widgets ? 'bg-surface-toggle-on' : 'bg-surface-toggle-off'}">
+								<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow transition-transform duration-200 {formSurfaces.widgets ? 'translate-x-4' : 'translate-x-0.5'}"></div>
+							</div>
+						</button>
+					{:else}
+						<div class="flex items-center justify-between py-1 opacity-50" title="Coming in a future release">
+							<span class="text-[0.75rem] text-content-muted">Widgets <span class="text-[0.7rem] text-content-dim">(soon)</span></span>
+							<div class="w-9 h-5 rounded-full bg-surface-toggle-off relative shrink-0">
+								<div class="absolute top-0.5 w-4 h-4 rounded-full bg-surface-toggle-knob shadow translate-x-0.5"></div>
+							</div>
 						</div>
-					</div>
+					{/if}
 				</div>
 			{/if}
 		</div>

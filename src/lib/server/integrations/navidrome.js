@@ -2,6 +2,7 @@
 //
 // Surfaces:
 //   - searchProviders.music — searches artists, albums and songs
+//   - widgets.player — plays a song from search in Holm, through proxy.stream
 //
 // Auth is Subsonic token auth: every call sends t = md5(password + salt) and
 // the salt. Holm takes the password once, computes the token with a random
@@ -93,6 +94,8 @@ const adapter = {
 		music: {
 			label: 'Music',
 			kind: 'media',
+			// All music: compact cover-and-title cards, not posters.
+			layout: 'tracks',
 			mode: 'inline',
 			async query({ config, query, limit, fetch }) {
 				if (!config?.url || !config?.token) return { results: [] };
@@ -136,21 +139,35 @@ const adapter = {
 						title: s.title,
 						subtitle: ['Song', s.artist, s.album].filter(Boolean).join(' · '),
 						cover: s.coverArt,
-						href: s.albumId ? `${base}/app/#/album/${encodeURIComponent(s.albumId)}/show` : `${base}/app/`
+						href: s.albumId ? `${base}/app/#/album/${encodeURIComponent(s.albumId)}/show` : `${base}/app/`,
+						song: s
 					}))
 				];
 				return {
-					results: items.slice(0, max).map((item) => ({
-						id: String(item.id),
-						title: item.title || 'Untitled',
-						subtitle: item.subtitle,
-						thumbnail:
+					results: items.slice(0, max).map((item) => {
+						const thumbnail =
 							item.cover && COVER_ID.test(item.cover)
 								? `/api/integrations/navidrome/proxy/cover/${encodeURIComponent(item.cover)}`
-								: undefined,
-						href: item.href,
-						meta: { kind: 'media' }
-					}))
+								: undefined;
+						// A song plays in Holm's own player, through the stream proxy.
+						const track = item.song && COVER_ID.test(item.song.id)
+							? {
+								title: item.title || 'Untitled',
+								artist: item.song.artist || '',
+								duration: Number(item.song.duration) || 0,
+								stream: `/api/integrations/navidrome/proxy/stream/${encodeURIComponent(item.song.id)}`,
+								cover: thumbnail
+							}
+							: undefined;
+						return {
+							id: String(item.id),
+							title: item.title || 'Untitled',
+							subtitle: item.subtitle,
+							thumbnail,
+							href: item.href,
+							meta: track ? { kind: 'media', track } : { kind: 'media' }
+						};
+					})
 				};
 			}
 		}
@@ -166,10 +183,28 @@ const adapter = {
 				}
 				return subsonic(config, 'getCoverArt', { id, size: String(COVER_SIZE) }, fetch);
 			}
+		},
+		// The original file, not a transcode, so Navidrome answers Range
+		// requests: Safari won't play audio from a server that doesn't.
+		stream: {
+			stream: true,
+			defaultCacheControl: 'private, no-store',
+			async fetch({ config, params, request, fetch }) {
+				const id = params.path?.[0];
+				if (!id || !COVER_ID.test(id)) {
+					return new Response('Invalid song id', { status: 400 });
+				}
+				const range = request.headers.get('range');
+				return subsonic(config, 'stream', { id, format: 'raw' }, fetch, range ? { range } : {});
+			}
 		}
 	},
 
-	widgets: {}
+	// Off unless the operator sets `surfaces.widgets: true` and the user turns
+	// it on; without it a song opens in Navidrome like any other result.
+	widgets: {
+		player: { label: 'Player', description: 'Play songs from search in a corner player' }
+	}
 };
 
 function stripTrailingSlash(url) {
@@ -183,7 +218,7 @@ function tokenFor(password) {
 
 // A test before Connect still has the typed password; afterwards only the
 // stored salt and token exist.
-function subsonic(config, method, extra, fetch) {
+function subsonic(config, method, extra, fetch, headers = { accept: 'application/json' }) {
 	const auth = config.password ? tokenFor(config.password) : { salt: config.salt, token: config.token };
 	const params = new URLSearchParams({
 		u: config.username,
@@ -194,9 +229,7 @@ function subsonic(config, method, extra, fetch) {
 		f: 'json',
 		...extra
 	});
-	return fetch(`${stripTrailingSlash(config.url)}/rest/${method}?${params}`, {
-		headers: { accept: 'application/json' }
-	});
+	return fetch(`${stripTrailingSlash(config.url)}/rest/${method}?${params}`, { headers });
 }
 
 export default adapter;

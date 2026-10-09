@@ -3,6 +3,8 @@ import { resolve, dirname } from 'path';
 import yaml from 'js-yaml';
 import { marked } from 'marked';
 import { getBrandColor } from './brandColors.js';
+import { canSeeApp } from './appAccess.js';
+import { substituteEnvVars } from './envVars.js';
 
 let _config = null;
 
@@ -15,19 +17,9 @@ try {
 	});
 } catch { /* file may not exist yet */ }
 
-function substituteEnvVars(obj) {
-	if (typeof obj === 'string') {
-		return obj.replace(/\$\{(\w+)\}/g, (_, key) => process.env[key] || '');
-	}
-	if (Array.isArray(obj)) return obj.map(substituteEnvVars);
-	if (obj && typeof obj === 'object') {
-		return Object.fromEntries(
-			Object.entries(obj).map(([k, v]) => [k, substituteEnvVars(v)])
-		);
-	}
-	return obj;
-}
-
+// Fails closed: a missing, unreadable or invalid config throws, so Holm
+// refuses to start (and errors on each request after a bad edit) instead of
+// running on defaults with sign-in switched off.
 function loadConfig() {
 	if (_config) return _config;
 
@@ -35,13 +27,18 @@ function loadConfig() {
 	try {
 		raw = readFileSync(configPath, 'utf-8');
 	} catch (err) {
-		console.error(`[holm] Could not read config at ${configPath}: ${err.message}`);
-		console.error('[holm] Copy config.example.yml to config.yml to get started.');
-		_config = getDefaults();
-		return _config;
+		throw new Error(`Could not read config at ${configPath} (${err.message}). Copy config.example.yml to config.yml to get started.`);
 	}
 
-	const parsed = yaml.load(raw);
+	let parsed;
+	try {
+		parsed = yaml.load(raw);
+	} catch (err) {
+		throw new Error(`Invalid YAML in ${configPath}: ${err.message}`);
+	}
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		throw new Error(`${configPath} must be a YAML mapping of settings`);
+	}
 	_config = substituteEnvVars(parsed);
 	return _config;
 }
@@ -49,7 +46,7 @@ function loadConfig() {
 function getDefaults() {
 	return {
 		branding: { name: 'Holm', short_name: 'holm', description: 'Self-hosted dashboard', logo: null, favicon: null, font: { family: 'JetBrains Mono', url: null }, theme_color: '#09090b', accent_color: '#f5b942', show_footer: true },
-		auth: { enabled: false, oidc: {}, admin_usernames: [], password_change_url: null, registration: { enabled: false, url: null } },
+		auth: { enabled: false, oidc: {}, password_change_url: null, registration: { enabled: false, url: null } },
 		apps: [],
 		customization: { enabled: false },
 		search: { enabled: true, url: 'https://www.google.com/search', param: 'q' },
@@ -160,7 +157,7 @@ async function loadPrivacyHtml(config) {
 // When authenticated is false, only returns what the login page needs —
 // branding, auth settings, privacy (for T&C), and wallpaper flag.
 // Everything else (apps, integrations, search, etc.) stays server-side.
-export async function getClientConfig({ authenticated = true } = {}) {
+export async function getClientConfig({ authenticated = true, user = null } = {}) {
 	const config = getConfig();
 	const auth = {
 		enabled: config.auth?.enabled ?? false,
@@ -179,7 +176,7 @@ export async function getClientConfig({ authenticated = true } = {}) {
 	return {
 		branding: getBranding(),
 		auth: { ...auth, password_change_url: config.auth?.password_change_url || null },
-		apps: getAppsConfig(),
+		apps: getAppsConfig().filter((app) => canSeeApp(app, user)),
 		customization: { enabled: config.customization?.enabled ?? false },
 		search: getSearchConfig(),
 		wallpapers: { enabled: config.wallpapers?.enabled ?? false },

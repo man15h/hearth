@@ -1,7 +1,7 @@
 import { redirect, error } from '@sveltejs/kit';
 import * as client from 'openid-client';
 import { getOIDCConfig } from '$lib/server/oidc.js';
-import { signSession } from '$lib/server/session.js';
+import { signSession, SESSION_TTL_SECONDS } from '$lib/server/session.js';
 
 export async function GET({ url, cookies }) {
 	const state = cookies.get('oidc_state');
@@ -40,7 +40,8 @@ export async function GET({ url, cookies }) {
 
 	// Try userinfo endpoint for more complete data
 	try {
-		const userinfo = await client.fetchUserInfo(config, tokens.access_token);
+		// openid-client checks the reply is for the ID token's subject.
+		const userinfo = await client.fetchUserInfo(config, tokens.access_token, claims?.sub);
 		if (userinfo.preferred_username) username = userinfo.preferred_username;
 		else if (userinfo.email) username = userinfo.email.split('@')[0];
 		if (userinfo.name || userinfo.display_name) name = userinfo.name || userinfo.display_name;
@@ -61,11 +62,11 @@ export async function GET({ url, cookies }) {
 
 	// Persistent signed session cookie (includes groups for admin detection)
 	const sessionData = signSession({ name, username, groups });
-	cookies.set('session', sessionData, { path: '/', httpOnly: true, sameSite: 'lax', secure: true, maxAge: 60 * 60 * 24 * 30 });
+	cookies.set('session', sessionData, { path: '/', httpOnly: true, sameSite: 'lax', secure: true, maxAge: SESSION_TTL_SECONDS });
 	// Kept for logout: the provider's end-session endpoint uses it to know
 	// whose session to end and that the redirect back is legitimate.
 	const idToken = tokens.id_token;
-	if (idToken) cookies.set('oidc_id_token', idToken, { path: '/', httpOnly: true, sameSite: 'lax', secure: true, maxAge: 60 * 60 * 24 * 30 });
+	if (idToken) cookies.set('oidc_id_token', idToken, { path: '/', httpOnly: true, sameSite: 'lax', secure: true, maxAge: SESSION_TTL_SECONDS });
 
 	redirect(302, '/');
 }

@@ -20,7 +20,7 @@
 	const privacyConfig = siteConfig?.privacy || {};
 	const privacyHtml = privacyConfig.html || null;
 
-	let { oncomplete, authName = null, authUsername = null, devMode = false, isAdmin = false } = $props();
+	let { oncomplete, authName = null, authUsername = null, devMode = false } = $props();
 
 	let step = $state(authName ? 'onboarding' : 'welcome');
 	let slide = $state(0);
@@ -92,7 +92,7 @@
 		? serviceConfig
 			.map(s => {
 				const app = allApps.find(a => a.id === s.id);
-				if (!app || (app.admin_only && !isAdmin)) return null;
+				if (!app) return null;
 				return {
 					name: app.name,
 					desc: s.desc || app.setup_guide?.subtitle || '',
@@ -101,7 +101,7 @@
 			})
 			.filter(Boolean)
 		: allApps
-			.filter(item => item.self_hosted && !item.admin_only)
+			.filter(item => item.self_hosted)
 			.map(item => ({
 				name: item.name,
 				desc: item.setup_guide?.subtitle || '',
@@ -318,6 +318,8 @@
 						<!-- 6px dot, ~18x30px tap area via ::before -->
 						<button
 							class="relative w-1.5 h-1.5 rounded-full border-none cursor-pointer transition-all duration-200 p-0 before:absolute before:content-[''] before:-inset-x-1.5 before:-inset-y-3 {i === slide ? 'dot-active w-4' : 'dot-inactive'}"
+							aria-label="Slide {i + 1} of {totalSlides}"
+							aria-current={i === slide ? 'step' : undefined}
 							onclick={() => slide = i}
 						></button>
 					{/each}

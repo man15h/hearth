@@ -41,6 +41,7 @@
  * @property {string} [meta.takenAt]
  * @property {string} [meta.status]             Short badge, e.g. 'Available'
  * @property {string} [meta.tmdb]               '<movie|tv>:<tmdb id>' — identifies the title across providers
+ * @property {{ title: string, artist?: string, duration?: number, stream: string, cover?: string }} [meta.track]  A song Holm can play itself: `stream` is a proxy URL for the audio, `duration` in seconds
  * @property {boolean} [meta.merge]             This result stands for its title: other providers' results with the same `meta.tmdb` are hidden
  */
 
@@ -49,6 +50,8 @@
  * @property {string} label                     Shown in the provider switcher dropdown
  * @property {'inline'|'redirect'} mode         inline = dropdown of results; redirect = form-submit to an external URL
  * @property {'media'|'photo'} [kind]          Results are posters or photos, so the bar shows placeholders of that shape while the first ones load
+ * @property {'poster'|'tracks'|'grid'|'list'} [layout]  Overrides the layout picked from kind: media = poster, photo = grid, else list
+ * @property {'video'} [shelf]                Movies and shows from every provider with shelf 'video' share one "Movies & TV" row
  * @property {(ctx: AdapterContext & { query: string, limit: number }) => Promise<{ results: SearchResultItem[] }>} query
  */
 
@@ -81,6 +84,7 @@
  *
  * @property {(ctx: { config: object, params: Record<string,string>, request: Request, fetch: typeof fetch }) => Promise<Response>} fetch
  * @property {string} [defaultCacheControl]                    Cache-Control header to set if upstream doesn't provide one
+ * @property {boolean} [stream]                                 Audio or video: the deadline covers the response headers only, so the body can play for as long as it lasts
  */
 
 /**
@@ -115,7 +119,7 @@
  * @property {(ctx: { config: object }) => object} [prepareConfig]  Rewrites the merged config just before it is saved, e.g. swapping a password for a derived token
  * @property {Record<string, SearchProvider>} [searchProviders]
  * @property {Record<string, ProxyHandler>} [proxy]            Optional proxy handlers keyed by name (e.g. 'thumbnail')
- * @property {Record<string, object>} [widgets]                Reserved — widget rendering is out of scope for this PR
+ * @property {Record<string, { label: string, description?: string }>} [widgets]  Widgets behind the `widgets` surface, e.g. Navidrome's player; the user's switch is `surfaces.widgets`
  */
 
 export {};

@@ -184,6 +184,8 @@
 						{/each}
 						{#each section.items as item (item.key)}
 							{@const isSel = item.key === selectedKey}
+							<!-- Keyboard lives on the search input (combobox + aria-activedescendant). -->
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<div
 								id="{listId}-{item.key}"
 								role="option"
@@ -207,6 +209,18 @@
 											<svg class="launcher-thumb-fallback" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">{@html KIND_ICONS[item.kind] || KIND_ICONS.file}</svg>
 											{#if item.thumbnail}
 												<img class="is-loading" use:thumbLoading src={item.thumbnail} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={thumbFailed} />
+											{/if}
+											{#if item.play}
+												<button
+													type="button"
+													class="launcher-art-action"
+													tabindex="-1"
+													aria-label="Play {item.title}"
+													onmousedown={(e) => e.preventDefault()}
+													onclick={(e) => { e.stopPropagation(); item.play.run(); }}
+												>
+													<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>
+												</button>
 											{/if}
 										{/if}
 									</div>
